@@ -189,7 +189,7 @@ process post_alignment {
 
     script:
     """
-    samtools sort ${input.baseName}.bam -o ${input.baseName}.sorted
+    samtools sort ${input.baseName}.bam -o ${input.baseName}.sorted.bam
     samtools index ${input.baseName}.sorted.bam
     samtools idxstats ${input.baseName}.sorted.bam > ${input.baseName}.count
     """
