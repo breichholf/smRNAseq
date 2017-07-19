@@ -12,11 +12,20 @@
 
 /*
  *  Considerations / ToDo:
- *    - Add preprocessing steps:
+ *    - Add preprocessing steps?
  *        - Demultiplexing
  *        - Adapter clipping & Trimming
  *    - Write out json?
+ *    - Get hairpin (FASTA) from genome + 20nt downstream
+ *    - Build Hairpin index
+ *    - align to hairpin
  *    - Add R postprocessing!
+ *      - Get max positions
+ *      - Get mutation rates
+ *      - Get T>C read count
+ *      - Get steady state read count
+ *      - if available (json/align and count myself?) normalise read count to ppm
+ *        if not: norm to miRNA(!) mapped reads
  */
 
 version = 0.1.1
@@ -25,7 +34,6 @@ version = 0.1.1
 params.genome = false
 // Get genome files depending on --genome matched in impimba.config, if the genome is found and set on CLI.
 params.index         = params.genome ? params.genomes[ params.genome ].bowtie ?: false : false
-params.hairpin       = params.genome ? params.genomes[ params.genome ].hairpin ?: false : false
 params.wholeGenome   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.genomeAnno    = params.genome ? params.genomes[ params.genome ].genomeAnno ?: false : false
 params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
@@ -49,8 +57,6 @@ log.info "==========================================="
 log.info "Reads                : ${params.reads}"
 if (params.genome) log.info "Genome               : ${params.genome}"
 log.info "Genome Annotation    : ${params.genomeAnno}"
-log.info "miRBase hairpin      : ${params.hairpin}"
-log.info "Index                : ${params.index}"
 log.info "Mismatches           : ${mismatches}"
 log.info "Current user         : $USER"
 log.info "Current path         : $PWD"
@@ -63,19 +69,14 @@ log.info "==========================================="
  *  SETUP -- Error checking
  */
 
-if( params.hairpin ){
-  hairpins = file(params.hairpin)
-  if( !hairpins.exists() ) exit 1, "Hairpin file not found: ${params.hairpin}"
-}
 if( params.wholeGenome ){
   genomeFasta = file(params.wholeGenoeme)
   if( !genomeFasta.exists() ) exit 1, "Genome Fasta file not found: ${params.wholeGenome}"
 }
 
-// Do we really need this? We'll be generating the index every time...
-if( params.index ){
-  bt_index = file("${params.index}.1.ebwt")
-  bt_indices = Channel.fromPath( "${params.index}*" ).toList()
+if (params.genomeAnno) {
+  genomeAnno = file(params.genomeAnno)
+  if (!genomeAnno.exists()) exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
 }
 
 /* This allows passing wild card tagged files on CLI:
@@ -86,74 +87,122 @@ Channel
   .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
   .into { raw_reads }
 
-genomeParts = Channel.from('ribosome', 'mitochondria', 'genome_cleaned')
+// Required for genomic alignment for hierarchical counting
+// process prepareGenome {
+//   input:
+//   file genome from genomeFasta
+//   file rRnaPrecursor from rRNA
+//   file assReport from assemblyReport
 
-/*
- * PREPROCESSING - Extract Flybase Annotations:
- *   - Extract anything with Flybase in Col2 and name it
- *     according to the annotaiton in it's parent ID line
- */
-process prepareGenome {
+//   output:
+//   file '*.fa' into riboMitoGenomeFa
+
+//   script:
+//   """
+//   # Change Fasta to tab separated format
+//   gunzip -c $genome | \\
+//     awk '/^>/&&NR>1{printf \"%s\", /^>/ ? \$0\" \":\$0}' | \\
+//     tr ' ' '\\t' > genome_fb-names.txt
+
+//   # Get flybase[tab]ucscNames
+//   awk '(\$0 !~ /^#/){printf \"%s\\t%s\", \$1 \$NF}' $assReport > nameConv.tsv
+
+//   # Write out ribosome, mitochondria and
+//   # exchange other names to ucscNames
+//   awk -v names=\"nameConv.tsv\" \\
+//       -v ribo=\"ribosome.txt\" \\
+//       -v mito=\"mito.fa\" \\
+//       'BEGIN{
+//           while((getline L < names) > 0) {
+//             if (\$NF ~ \"chrM\") nameArray[\"mitochondrion_genome\"] = \$2
+//             if (\$1 ~ \"rDNA\") nameArray[\"rDNA\"] = \"rDNA\"
+//             else nameArray[\$1] = \$2
+//           }
+//         }
+//         {
+//           if (\$1 ~ /mitochondrion/) printf \">%s\\n%s\", nameArray[\$1], \$2 >> ribo
+//           else if (\$1 ~ /rDNA/) printf \">%s\\n%s\", nameArray[\$1], \$2 >> mito
+//           else printf \">%s\\n%s\", nameArray[\$1], \$2
+//         }' > genome_noMito-noRibo_incl-Y.fa
+
+//   cat ribosome.txt $rRnaPrecursor > ribosome.fa
+//   """
+// }
+
+// Prepare annotations for hierarchical counting
+// process prepareAnnos {
+//   beforeScript 'installdeps.R'
+
+//   input:
+//   file gff from genomeAnno
+//   file nameConv from assemblyReport
+//   file rRNA
+
+//   output:
+//   file "fullGenomeAnno.bed" into genomeAnno
+
+//   script:
+//   """
+//   # Extract Flybase Annos
+//   prepareref.R -g $gff -n $nameConv -o flybase.bed
+
+//   # Add rRNA Annotation
+
+//   """
+// }
+
+process extractHairpins {
+  tag "genomePrep"
+
   input:
   file genome from genomeFasta
-  file rRnaPrecursor from rRNA
-  file assReport from assemblyReport
+  file anno from genomeAnno
 
   output:
-  file '*.fa' into riboMitoGenomeFa
+  file "hairpin.fa" into hairpinFasta
 
   script:
   """
-  # Change Fasta to tab separated format
-  gunzip -c $genome | \\
-    awk '/^>/&&NR>1{printf \"%s\", /^>/ ? \$0\" \":\$0}' | \\
-    tr ' ' '\\t' > genome_fb-names.txt
-
-  # Get flybase[tab]ucscNames
-  awk '(\$0 !~ /^#/){printf \"%s\\t%s\", \$1 \$NF}' $assReport > nameConv.tsv
-
-  # Write out ribosome, mitochondria and
-  # exchange other names to ucscNames
-  awk -v names=\"nameConv.tsv\" \\
-      -v ribo=\"ribosome.txt\" \\
-      -v mito=\"mito.fa\" \\
-      'BEGIN{
-          while((getline L < names) > 0) {
-            if (\$NF ~ \"chrM\") nameArray[\"mitochondrion_genome\"] = \$2
-            if (\$1 ~ \"rDNA\") nameArray[\"rDNA\"] = \"rDNA\"
-            else nameArray[\$1] = \$2
+  grep pre_miR $anno | \
+    sed -e 's/\"//g' | \
+    awk -v FS="\t" '{OFS=FS} {
+        split(\$9, info, "; ")
+        for (i in info){
+          if (info[i] ~ /^transcript/) {
+            split(info[i], ts, " ")
+            tsid = ts[2]
           }
         }
-        {
-          if (\$1 ~ /mitochondrion/) printf \">%s\\n%s\", nameArray[\$1], \$2 >> ribo
-          else if (\$1 ~ /rDNA/) printf \">%s\\n%s\", nameArray[\$1], \$2 >> mito
-          else printf \">%s\\n%s\", nameArray[\$1], \$2
-        }' > genome_noMito-noRibo_incl-Y.fa
-
-  cat ribosome.txt $rRnaPrecursor > ribosome.fa
+        strand = \$7
+        if (strand == "+") {
+          start = \$4
+          end = \$5 + 20
+        } else {
+          start = \$4 - 20
+          end = \$5
+        }
+        print \$1, start, end, tsid, 0, strand
+      }' > hairpin_plus20nt.bed
+    bedtools getfasta -fi $genome -bed hairpin_plus20nt.bed > hairpin.fa
   """
 }
-process prepareAnnos {
-  beforeScript 'installdeps.R'
+
+prepare makeIndex {
+  tag "Indexes"
 
   input:
-  file gff from genomeAnno
-  file nameConv from assemblyReport
-  file rRNA
+  file hairpin from hairpinFasta
 
   output:
-  file "fullGenomeAnno.bed" into genomeAnno
+  file "hairpin_idx*" into hairpin_index
 
   script:
   """
-  # Extract Flybase Annos
-  prepareref.R -g $gff -n $nameConv -o flybase.bed
-
-  # Add rRNA Annotation
-
+  bowtie-build $hairpin hairpin_idx
   """
 }
 
+// Clip 3' Adapter using cutadapt
 process trim_adapter {
   tag "$reads"
 
@@ -219,14 +268,14 @@ process bowtie_hairpins {
   input_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
   prefix = reads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   """
-  bowtie \\
-    -a --best --strata \\
-    -v $mismatches \\
-    -S \\
-    -p ${task.cpus} \\
-    $input_base \\
-    -q <(zcat $reads) | \\
-    /groups/ameres/Reichholf/bioinf/scripts/arrayTagTCreads.awk | \\
+  bowtie \
+    -a --best --strata \
+    -v $mismatches \
+    -S \
+    -p ${task.cpus} \
+    $input_base \
+    -q <(zcat $reads) | \
+    arrayTagTCreads.awk | \
     samtools view -bS - > ${prefix}.TCtagged_hairpin.bam
   """
 }
