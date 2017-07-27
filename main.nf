@@ -36,6 +36,7 @@ params.genome = false
 params.index         = params.genome ? params.genomes[ params.genome ].bowtie ?: false : false
 params.wholeGenome   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.genomeAnno    = params.genome ? params.genomes[ params.genome ].genomeAnno ?: false : false
+params.mirArmAnno    = params.genome ? params.genomes[ params.genome ].mirArmAnno ?: false : false
 params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
 params.rdna          = params.genome ? params.genomes[ params.genome ].ribosome ?: false : false
 params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
@@ -77,6 +78,11 @@ if( params.wholeGenome ){
 if (params.genomeAnno) {
   genomeAnno = file(params.genomeAnno)
   if (!genomeAnno.exists()) exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
+}
+
+if (params.mirArmAnno) {
+  mirArmAnno = file(params.mirArmAnno)
+  if (!mirArmAnno.exists()) exit 1, "Genome annotation file ${params.mirArmAnno} not found. Please download from flybase."
 }
 
 /* This allows passing wild card tagged files on CLI:
@@ -182,8 +188,8 @@ process extractHairpins {
           end = \$5
         }
         print \$1, start, end, tsid, 0, strand
-      }' > hairpin_plus20nt.bed
-    bedtools getfasta -fi $genome -bed hairpin_plus20nt.bed > hairpin.fa
+      }' | tr ' ' '\t' > hairpin_plus20nt.bed
+    bedtools getfasta -s -fi $genome -bed hairpin_plus20nt.bed > hairpin.fa
   """
 }
 
@@ -241,7 +247,10 @@ process trim_4N {
   script:
   prefix = reads.toString() - ".adapter_clipped.fq.gz"
   """
-  /home/imba/reichholf/bin/seqtk trimfq \\
+  git clone https://github.com/lh3/seqtk.git
+  cd seqtk
+  make
+  seqtk trimfq \\
     -b 4 \\
     -e 4 \\
     $reads > ${prefix}.trimmed.fq
@@ -293,6 +302,7 @@ process post_alignment {
 
   input:
   file input from hairpin_aligned
+  file mirArms from mirArmAnno
 
   output:
   file "${input.baseName}.count" into hairpin_counts
@@ -304,5 +314,59 @@ process post_alignment {
   samtools sort ${input.baseName}.bam -o ${input.baseName}.sorted.bam
   samtools index ${input.baseName}.sorted.bam
   samtools idxstats ${input.baseName}.sorted.bam > ${input.baseName}.count
+  """
+}
+
+process writeJson {
+  /*
+   * INFO:
+   *   `file sortedBams from hairpin_sorted_bam.collect()` takes care of staging
+   *   This way `post_alignment` can still run in parallel, for each sample.
+   *   Then `writeJson` will run after that is all done.
+   *   Currently we are NOT allowing normalisation by sRNA-mapping reads(!) and will
+   *   simply report raw counts instead.
+   *   To 'future proof' the R analysis, we have included the option for normalisation
+   *   but are simply setting that count to 1000000
+   *   Also, we're not handling time at the moment, but this would be an easy fix
+   *   once we move to a sample sheet.
+   */
+
+  // !!!!
+  // Mode needs to change to "copy" if we're going to use the json file later on
+  // !!!!
+  publishDir "${params.outdir}/counting", mode: "move", pattern: *.json
+
+  input:
+  file sortedBams from hairpin_sorted_bam.collect()
+  file mirArms from mirArmAnno
+
+  output:
+  file "samples.json" into readCountConfig
+
+  script:
+  """
+  #!/usr/bin/env python
+  import json
+
+  bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
+  jsDict = {"base": "${params.outdir}/bowtie",
+            "mir.anno": $mirArms}
+
+  samples = []
+
+  for (bam in bamfiles):
+    nameElements = bam.split('_')
+    idx = int(nameElements[0])
+    sRNAreads = 1000000
+    samples.append({"id": idx,
+                    "time": str(idx) + "h",
+                    "align": bam,
+                    "posFile": str(idx) + "_pos.tsv",
+                    "sRNAreads": sRNAreads})
+
+  jsDict["samples"] = samples
+
+  with open('samples.json', 'w') as fp:
+    json.dump(jsDict, fp)
   """
 }
