@@ -334,7 +334,7 @@ process writeJson {
   // !!!!
   // Mode needs to change to "copy" if we're going to use the json file later on
   // !!!!
-  publishDir "${params.outdir}/counting", mode: "move", pattern: *.json
+  publishDir "${params.outdir}/counting", mode: "move", pattern: '*.json'
 
   input:
   file sortedBams from hairpin_sorted_bam.collect()
