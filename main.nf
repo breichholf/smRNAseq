@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = 0.1.1
+version = "0.1.1"
 
 // Configurable variables -- default values
 params.genome = false
