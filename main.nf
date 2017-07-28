@@ -272,7 +272,7 @@ process bowtie_hairpins {
   file '*.TCtagged_hairpin.bam' into hairpin_aligned
 
   script:
-  input_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
+  index_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
   prefix = reads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   """
   bowtie \
@@ -280,7 +280,7 @@ process bowtie_hairpins {
     -v $mismatches \
     -S \
     -p ${task.cpus} \
-    $input_base \
+    $index_base \
     -q <(zcat $reads) | \
     arrayTagTCreads.awk | \
     samtools view -bS - > ${prefix}.TCtagged_hairpin.bam
