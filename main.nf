@@ -91,7 +91,7 @@ if (params.mirArmAnno) {
 Channel
   .fromPath( params.reads )
   .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
-  .into { raw_reads }
+  .set { raw_reads }
 
 // Required for genomic alignment for hierarchical counting
 // process prepareGenome {
@@ -194,8 +194,6 @@ process extractHairpins {
 }
 
 prepare makeIndex {
-  tag "Indexes"
-
   input:
   file hairpin from hairpinFasta
 
