@@ -47,7 +47,7 @@ params.outdir = './results'
 mismatches = params.mismatches ? ${params.mismatches} ?: 0 : 3
 
 // Check that we have a hairpin and wholeGenome reference Fasta!
-if( !params.hairpin ){
+if( !params.genomeAnno ){
     exit 1, "Missing hairpin reference indexes! Is --genome specified?"
 }
 
