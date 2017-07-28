@@ -71,7 +71,7 @@ log.info "==========================================="
  */
 
 if( params.wholeGenome ){
-  genomeFasta = file(params.wholeGenoeme)
+  genomeFasta = file(params.wholeGenome)
   if( !genomeFasta.exists() ) exit 1, "Genome Fasta file not found: ${params.wholeGenome}"
 }
 
