@@ -41,10 +41,10 @@ params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames
 params.rdna          = params.genome ? params.genomes[ params.genome ].ribosome ?: false : false
 params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
 params.saveReference = false
-params.name = "miRNA-Seq Best practice"
-params.outdir = './results'
+params.name          = "miRNA-Seq Best practice"
+params.outdir        = './results'
 // if params.mismatches is null, assign 3, otherwise assign mismatches
-mismatches = params.mismatches ? ${params.mismatches} ?: 0 : 3
+mismatches           = params.mismatches ? ${params.mismatches} ?: false : 3
 
 // Check that we have a hairpin and wholeGenome reference Fasta!
 if( !params.genomeAnno ){
