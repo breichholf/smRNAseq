@@ -33,8 +33,8 @@ version = "0.1.1"
 // Configurable variables -- default values
 params.genome = false
 // Get genome files depending on --genome matched in impimba.config, if the genome is found and set on CLI.
-params.index         = params.genome ? params.genomes[ params.genome ].bowtie ?: false : false
-params.wholeGenome   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
+// params.index         = params.genome ? params.genomes[ params.genome ].bowtie ?: false : false
+params.genomeFasta   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.genomeAnno    = params.genome ? params.genomes[ params.genome ].genomeAnno ?: false : false
 params.mirArmAnno    = params.genome ? params.genomes[ params.genome ].mirArmAnno ?: false : false
 params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
@@ -70,19 +70,19 @@ log.info "==========================================="
  *  SETUP -- Error checking
  */
 
-if( params.wholeGenome ){
-  genomeFasta = file(params.wholeGenome)
-  if( !genomeFasta.exists() ) exit 1, "Genome Fasta file not found: ${params.wholeGenome}"
+if( params.genomeFasta ){
+  genomeFastaFile = Channel.fromPath(params.genomeFasta)
+  if( !file(params.genomeFasta).exists() ) exit 1, "Genome Fasta file not found: ${params.genomeFasta}"
 }
 
 if (params.genomeAnno) {
-  genomeAnno = file(params.genomeAnno)
-  if (!genomeAnno.exists()) exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
+  genomeAnno = Channel.fromPath(params.genomeAnno)
+  if (!file(params.genomeAnno).exists()) exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
 }
 
 if (params.mirArmAnno) {
-  mirArmAnno = file(params.mirArmAnno)
-  if (!mirArmAnno.exists()) exit 1, "Genome annotation file ${params.mirArmAnno} not found. Please download from flybase."
+  mirArmAnno = Channel.fromPath(params.mirArmAnno)
+  if (!file(params.mirArmAnno).exists()) exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
 }
 
 /* This allows passing wild card tagged files on CLI:
@@ -161,15 +161,15 @@ process extractHairpins {
   tag "genomePrep"
 
   input:
-  file genome from genomeFasta
-  file anno from genomeAnno
+  file genomeFastaFile
+  file genomeAnno
 
   output:
   file "hairpin.fa" into hairpinFasta
 
   script:
   """
-  grep pre_miR $anno | \
+  grep pre_miR $genomeAnno | \
     sed -e 's/\"//g' | \
     awk -v FS="\t" '{OFS=FS} {
         split(\$9, info, "; ")
@@ -189,20 +189,23 @@ process extractHairpins {
         }
         print \$1, start, end, tsid, 0, strand
       }' | tr ' ' '\t' > hairpin_plus20nt.bed
-    bedtools getfasta -s -fi $genome -bed hairpin_plus20nt.bed > hairpin.fa
+    zcat -f ${genomeFastaFile} > genome.fa
+    samtools faidx genome.fa
+    bedtools getfasta -s -fi genome.fa -bed hairpin_plus20nt.bed > hairpin.fa
   """
 }
 
-prepare makeIndex {
+process makeIndex {
   input:
-  file hairpin from hairpinFasta
+  file hairpinFasta
 
   output:
   file "hairpin_idx*" into hairpin_index
 
   script:
   """
-  bowtie-build $hairpin hairpin_idx
+  samtools faidx hairpin.fa
+  bowtie-build ${hairpinFasta} hairpin_idx
   """
 }
 
