@@ -247,10 +247,13 @@ process trim_4N {
 
   script:
   prefix = reads.toString() - ".adapter_clipped.fq.gz"
+  zlibDir = "-L" + ${workflow.workDir} + "/zlib-1.2.11"
   """
+  wget https://zlib.net/zlib-1.2.11.tar.gz
+  tar zxf zlib
+  LDFLAGS=${zlibDir}
   git clone https://github.com/lh3/seqtk.git
-  cd seqtk
-  make
+  cd seqtk; make; cp seqtk ../; cd ..
   seqtk trimfq \\
     -b 4 \\
     -e 4 \\
