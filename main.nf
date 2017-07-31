@@ -159,16 +159,6 @@ Channel
 //   """
 // }
 
-process prepareTools {
-  """
-  wget https://zlib.net/zlib-1.2.11.tar.gz
-  tar zxf zlib-1.2.11.tar.gz
-  LDFLAGS="-L${workflow.workDir}/zlib-1.2.11"
-  git clone https://github.com/lh3/seqtk.git
-  cd seqtk; make; cp seqtk ${baseDir}/bin
-  """
-}
-
 process extractHairpins {
   tag "genomePrep"
 
