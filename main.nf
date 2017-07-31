@@ -64,6 +64,8 @@ log.info "Current path         : $PWD"
 log.info "Script dir           : $baseDir"
 log.info "Output dir           : ${params.outdir}"
 log.info "Config Profile       : ${workflow.profile}"
+log.info "Script Path          : ${workflow.scriptFile}"
+log.info "Project Dir          : ${workflow.projectDir}"
 log.info "==========================================="
 
 /*
@@ -157,6 +159,18 @@ Channel
 //   """
 // }
 
+process prepareTools {
+  script:
+  zlibDir = "-L" + ${workflow.workDir} + "/zlib-1.2.11"
+  """
+  wget https://zlib.net/zlib-1.2.11.tar.gz
+  tar zxf zlib
+  LDFLAGS=${zlibDir}
+  git clone https://github.com/lh3/seqtk.git
+  cd seqtk; make; cp seqtk ${baseDir}/bin
+  """
+}
+
 process extractHairpins {
   tag "genomePrep"
 
@@ -247,13 +261,7 @@ process trim_4N {
 
   script:
   prefix = reads.toString() - ".adapter_clipped.fq.gz"
-  zlibDir = "-L" + ${workflow.workDir} + "/zlib-1.2.11"
   """
-  wget https://zlib.net/zlib-1.2.11.tar.gz
-  tar zxf zlib
-  LDFLAGS=${zlibDir}
-  git clone https://github.com/lh3/seqtk.git
-  cd seqtk; make; cp seqtk ../; cd ..
   seqtk trimfq \\
     -b 4 \\
     -e 4 \\
