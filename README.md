@@ -8,14 +8,14 @@ The pipeline is based on SciLifeLab/NGI-smRNAseq and borrows heavily from it. It
 
 In no particular order:
 
-[x] Write nextflow proof of concept pipeline for `bowtie -> arrayTagTCreads.awk -> write json`
-[x] JSON for file parsing should give all information
-[ ] Nextflow pipeline: Map `rDNA > Mito > 1) genome unique -> multi 2) pre-miRs unique -> multi`
-[ ] Quantify from above -- extract smallRNA reads for normalisation
-[ ] Get U-list for all positions from 0 - END-21 (python -- script ready)
-[ ] Parse JSON and create count & TC counts
-[ ] Get U>C conversion (per position) from pileup
-[ ] Get all mutations from pileups
-[ ] Tally all mutations in boxplot
-[ ] Combining R analysis and nextflow: json format for files?
-[ ] Extract smallRNA mappers from custom bash-AnnotationPipeline?
+- [x] Write nextflow proof of concept pipeline for `bowtie -> arrayTagTCreads.awk -> write json`
+- [x] JSON for file parsing should give all information
+- [ ] Nextflow pipeline: Map `rDNA > Mito > 1) genome unique -> multi 2) pre-miRs unique -> multi`
+- [ ] Quantify from above -- extract smallRNA reads for normalisation
+- [ ] Get U-list for all positions from 0 - END-21 (python -- script ready)
+- [ ] Parse JSON and create count & TC counts
+- [ ] Get U>C conversion (per position) from pileup
+- [ ] Get all mutations from pileups
+- [ ] Tally all mutations in boxplot
+- [ ] Combining R analysis and nextflow: json format for files?
+- [ ] Extract smallRNA mappers from custom bash-AnnotationPipeline?

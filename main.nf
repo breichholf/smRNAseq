@@ -303,7 +303,6 @@ process post_alignment {
 
   input:
   file input from hairpin_aligned
-  file mirArms from mirArmAnno
 
   output:
   file "${input.baseName}.count" into hairpin_counts
@@ -339,7 +338,7 @@ process writeJson {
 
   input:
   file sortedBams from hairpin_sorted_bam.collect()
-  file mirArms from mirArmAnno
+  file mirArmAnno
 
   output:
   file "samples.json" into readCountConfig
@@ -351,7 +350,7 @@ process writeJson {
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
   jsDict = {"base": "${params.outdir}/bowtie",
-            "mir.anno": $mirArms}
+            "mir.anno": $mirArmAnno}
 
   samples = []
 
