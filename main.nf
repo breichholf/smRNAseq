@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.1.1"
+version = "0.2.0"
 
 // Configurable variables -- default values
 params.genome = false
@@ -84,8 +84,8 @@ if (params.genomeAnno) {
 }
 
 if (params.mirArmAnno) {
-  mirArmAnno = Channel.fromPath(params.mirArmAnno)
-  if (!file(params.mirArmAnno).exists()) exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
+  mirArmAnno = file(params.mirArmAnno)
+  if (!mirArmAnno.exists()) exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
 }
 
 /* This allows passing wild card tagged files on CLI:
@@ -338,7 +338,6 @@ process writeJson {
 
   input:
   file sortedBams from hairpin_sorted_bam.collect()
-  file mirArmAnno
 
   output:
   file "samples.json" into readCountConfig
@@ -347,6 +346,7 @@ process writeJson {
   """
   #!/usr/bin/env python
   import json
+  import os
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
   jsDict = {"base": "${params.outdir}/bowtie",
