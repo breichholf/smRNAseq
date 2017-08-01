@@ -94,7 +94,7 @@ if (params.mirArmAnno) {
 Channel
   .fromPath( params.reads )
   .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
-  .set { raw_reads }
+  .set { rawReads }
 
 // Required for genomic alignment for hierarchical counting
 // process prepareGenome {
@@ -205,7 +205,7 @@ process makeIndex {
   file hairpinFasta
 
   output:
-  file "hairpin_idx*" into hairpin_index
+  file "hairpin_idx*" into hairpinIndex
 
   script:
   """
@@ -219,11 +219,11 @@ process trim_adapter {
   tag "$reads"
 
   input:
-  file reads from raw_reads
+  file reads from rawReads
 
   output:
-  file "*.adapter_clipped.fq.gz" into adapter_clipped
-  file "*.trim_report.txt" into trim_results
+  file "*.adapter_clipped.fq.gz" into adapterClipped
+  file "*.trim_report.txt" into trimResults
 
   script:
   prefix = reads.toString() - ~/(\.fq)?(\.fastq)?(\.gz)?$/
@@ -242,23 +242,23 @@ process trim_adapter {
  */
 
 process trim_4N {
-  tag "$reads"
+  tag "$acReads"
 
   input:
-  file reads from adapter_clipped
+  file acReads from adapterClipped
 
   output:
-  file "*.trimmed.fq.gz" into trimmed_reads
+  file "*.trimmed.fq.gz" into trimmedReads
 
   script:
-  prefix = reads.toString() - ".adapter_clipped.fq.gz"
+  prefix = acReads.toString() - ".adapter_clipped.fq.gz"
   """
   seqtk trimfq \\
     -b 4 \\
     -e 4 \\
-    $reads > ${prefix}.trimmed.fq
+    $acReads > trimmedReads.fq
 
-  gzip ${prefix}.trimmed.fq
+  gzip -c trimmedReads.fq > ${prefix}.trimmed.fq.gz
   """
 }
 
@@ -266,29 +266,29 @@ process trim_4N {
  * STEP 3: Align
  */
 process bowtie_hairpins {
-  tag "$reads"
+  tag "$trimmedReads"
 
   publishDir "${params.outdir}/bowtie/ext_hairpins", mode: "copy", pattern: '*.TCtagged_hairpin.bam'
 
   input:
-  file reads from trimmed_reads
-  file index from hairpin_index
+  file trimmedReads
+  file index from hairpinIndex
 
   output:
-  file '*.TCtagged_hairpin.bam' into hairpin_aligned
+  file '${prefix}.TCtagged_hairpin.bam' into hairpinAligned
 
   script:
   index_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
-  prefix = reads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
+  prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   """
-  echo "${reads}" >> postBowtie.log
+  echo "${trimmedReads}" >> postBowtie.log
   bowtie \
     -a --best --strata \
     -v $mismatches \
     -S \
     -p ${task.cpus} \
     $index_base \
-    -q <(zcat $reads) | \
+    -q <(zcat $trimmedReads) | \
     arrayTagTCreads.awk | \
     samtools view -bS - > ${prefix}.TCtagged_hairpin.bam
   """
@@ -308,12 +308,12 @@ process post_alignment {
   publishDir "${params.outdir}/bowtie", mode: "copy", saveAs: wrap_hairpin
 
   input:
-  file input from hairpin_aligned
+  file input from hairpinAligned
 
   output:
-  file "${input.baseName}.count" into hairpin_counts
-  file "${input.baseName}.sorted.bam" into hairpin_sorted_bam
-  file "${input.baseName}.sorted.bam.bai" into hairpin_sorted_bai
+  file "${input.baseName}.count" into hairpinCounts
+  file "${input.baseName}.sorted.bam" into hairpinSorted
+  file "${input.baseName}.sorted.bam.bai" into hairpinSortedIndex
 
   script:
   """
@@ -327,7 +327,7 @@ process post_alignment {
 process writeJson {
   /*
    * INFO:
-   *   `file sortedBams from hairpin_sorted_bam.collect()` takes care of staging
+   *   `file sortedBams from hairpinSorted.collect()` takes care of staging
    *   This way `post_alignment` can still run in parallel, for each sample.
    *   Then `writeJson` will run after that is all done.
    *   Currently we are NOT allowing normalisation by sRNA-mapping reads(!) and will
@@ -344,12 +344,19 @@ process writeJson {
   publishDir "${params.outdir}/counting", mode: "move", pattern: '*.json'
 
   input:
-  file sortedBams from hairpin_sorted_bam.collect()
+  file sortedBams from hairpinSorted
+  file counts from hairpinCounts
 
   output:
   file "samples.json" into readCountConfig
 
   script:
+  """
+  awk -v name=${sortedBams.baseName} \
+    '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' \
+    > countsum.txt
+  """
+
   """
   #!/usr/bin/env python
   import json
@@ -359,9 +366,15 @@ process writeJson {
   jsDict = {"base": "${params.outdir}/bowtie",
             "mir.anno": "$mirArmAnno"}
 
+  with open('countsum.txt', 'r') as counts:
+    countStats = counts.readline()
+
+  fullName, mapped, unmapped = countStats.split('\t')
+
   samples = []
 
   print('Debug-STR :: {}'.format(bamfiles))
+  print('Debug-Counts :: {} - {} - {}'.format(fullName, mapped, unmapped))
 
   for bam in bamfiles:
     nameElements = bam.split('_')
