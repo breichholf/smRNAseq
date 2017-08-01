@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.2.0"
+version = "0.2.2"
 
 // Configurable variables -- default values
 params.genome = false
@@ -73,19 +73,20 @@ log.info "==========================================="
  *  SETUP -- Error checking
  */
 
-if( params.genomeFasta ){
-  genomeFastaFile = Channel.fromPath(params.genomeFasta)
-  if( !file(params.genomeFasta).exists() ) exit 1, "Genome Fasta file not found: ${params.genomeFasta}"
+genomeFastaFile = params.genomeFasta ? file(params.genomeFasta) : null
+genomeAnno      = params.genomeAnno ? file(params.genomeAnno) : null
+mirArmAnno      = params.mirArmAnno ? file(params.mirArmAnno) : null
+
+if( !params.genomeFasta || !genomeFastaFile.exists() ) {
+   exit 1, "Genome Fasta file not found: ${params.genomeFasta}. Please download from flybase."
 }
 
-if (params.genomeAnno) {
-  genomeAnno = Channel.fromPath(params.genomeAnno)
-  if (!file(params.genomeAnno).exists()) exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
+if ( !params.genomeAnno || !genomeAnno.exists() ) {
+  exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
 }
 
-if (params.mirArmAnno) {
-  mirArmAnno = file(params.mirArmAnno)
-  if (!mirArmAnno.exists()) exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
+if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
+  exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
 }
 
 /* This allows passing wild card tagged files on CLI:
@@ -228,11 +229,11 @@ process trim_adapter {
   script:
   prefix = reads.toString() - ~/(\.fq)?(\.fastq)?(\.gz)?$/
   """
-  cutadapt \\
-    -m 26 \\
-    -M 38 \\
-    -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \\
-    -o ${prefix}.adapter_clipped.fq.gz \\
+  cutadapt \
+    -m 26 \
+    -M 38 \
+    -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+    -o ${prefix}.adapter_clipped.fq.gz \
     $reads > ${prefix}.trim_report.txt
   """
 }
@@ -275,7 +276,7 @@ process bowtie_hairpins {
   file index from hairpinIndex
 
   output:
-  file '${prefix}.TCtagged_hairpin.bam' into hairpinAligned
+  file '*.TCtagged_hairpin.bam' into hairpinAligned
 
   script:
   index_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
@@ -344,8 +345,8 @@ process writeJson {
   publishDir "${params.outdir}/counting", mode: "move", pattern: '*.json'
 
   input:
-  file sortedBams from hairpinSorted
-  file counts from hairpinCounts
+  file sortedBams from hairpinSorted.toSortedList()
+  file counts from hairpinCounts.toSortedList()
 
   output:
   file "samples.json" into readCountConfig
