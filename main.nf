@@ -199,6 +199,8 @@ process extractHairpins {
 }
 
 process makeIndex {
+  tag "Hairpins"
+
   input:
   file hairpinFasta
 
@@ -265,6 +267,7 @@ process trim_4N {
  */
 process bowtie_hairpins {
   tag "$reads"
+
   publishDir "${params.outdir}/bowtie/ext_hairpins", mode: "copy", pattern: '*.TCtagged_hairpin.bam'
 
   input:
@@ -299,6 +302,8 @@ def wrap_hairpin = { file ->
 }
 
 process post_alignment {
+  tag "$reads"
+
   publishDir "${params.outdir}/bowtie", mode: "copy", saveAs: wrap_hairpin
 
   input:
@@ -350,7 +355,7 @@ process writeJson {
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
   jsDict = {"base": "${params.outdir}/bowtie",
-            "mir.anno": $mirArmAnno}
+            "mir.anno": "$mirArmAnno"}
 
   samples = []
 
