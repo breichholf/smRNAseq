@@ -45,7 +45,7 @@ params.saveReference = false
 params.name          = "miRNA-Seq Best practice"
 params.outdir        = './results'
 // if params.mismatches is null, assign 3, otherwise assign mismatches
-mismatches           = ${params.mismatches} ?: 3
+mismatches           = params.mismatches ?: 3
 
 // Check that we have a hairpin and wholeGenome reference Fasta!
 if( !params.genomeAnno ){
