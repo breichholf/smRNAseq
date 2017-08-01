@@ -32,6 +32,7 @@ version = "0.1.1"
 
 // Configurable variables -- default values
 params.genome = false
+params.mismatches = 3
 // Get genome files depending on --genome matched in impimba.config, if the genome is found and set on CLI.
 // params.index         = params.genome ? params.genomes[ params.genome ].bowtie ?: false : false
 params.genomeFasta   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
@@ -44,7 +45,7 @@ params.saveReference = false
 params.name          = "miRNA-Seq Best practice"
 params.outdir        = './results'
 // if params.mismatches is null, assign 3, otherwise assign mismatches
-mismatches           = params.mismatches ? ${params.mismatches} ?: false : 3
+mismatches           = ${params.mismatches} ?: 3
 
 // Check that we have a hairpin and wholeGenome reference Fasta!
 if( !params.genomeAnno ){
@@ -353,7 +354,9 @@ process writeJson {
 
   samples = []
 
-  for (bam in bamfiles):
+  print('Debug-STR :: {}'.format(bamfiles))
+
+  for bam in bamfiles:
     nameElements = bam.split('_')
     idx = int(nameElements[0])
     sRNAreads = 1000000
