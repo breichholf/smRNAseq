@@ -281,6 +281,7 @@ process bowtie_hairpins {
   index_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
   prefix = reads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   """
+  echo "${reads}" >> postBowtie.log
   bowtie \
     -a --best --strata \
     -v $mismatches \
@@ -316,6 +317,7 @@ process post_alignment {
 
   script:
   """
+  echo "${input.baseName}" >> postAlignment.log
   samtools sort ${input.baseName}.bam -o ${input.baseName}.sorted.bam
   samtools index ${input.baseName}.sorted.bam
   samtools idxstats ${input.baseName}.sorted.bam > ${input.baseName}.count
