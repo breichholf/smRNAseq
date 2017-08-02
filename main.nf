@@ -353,9 +353,10 @@ process writeJson {
 
   script:
   """
-  awk -v name=${sortedBams.baseName} \
-    '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' \
-    > countsum.txt
+  # awk -v name=${sortedBams.baseName} \
+  #   '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' \
+  #   > countsum.txt
+  echo $counts
   """
 
   """
@@ -367,8 +368,8 @@ process writeJson {
   jsDict = {"base": "${params.outdir}/bowtie",
             "mir.anno": "$mirArmAnno"}
 
-  with open('countsum.txt', 'r') as counts:
-    countStats = counts.readline()
+  # with open('countsum.txt', 'r') as counts:
+  #   countStats = counts.readline()
 
   fullName, mapped, unmapped = countStats.split('\t')
 
