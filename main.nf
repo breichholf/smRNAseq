@@ -65,8 +65,6 @@ log.info "Current path         : $PWD"
 log.info "Script dir           : $baseDir"
 log.info "Output dir           : ${params.outdir}"
 log.info "Config Profile       : ${workflow.profile}"
-log.info "Script Path          : ${workflow.scriptFile}"
-log.info "Project Dir          : ${workflow.projectDir}"
 log.info "==========================================="
 
 /*
@@ -304,24 +302,24 @@ def wrap_hairpin = { file ->
 }
 
 process post_alignment {
-  tag "$reads"
+  tag "$hairpinAligned"
 
   publishDir "${params.outdir}/bowtie", mode: "copy", saveAs: wrap_hairpin
 
   input:
-  file input from hairpinAligned
+  file hairpinAligned
 
   output:
-  file "${input.baseName}.count" into hairpinCounts
-  file "${input.baseName}.sorted.bam" into hairpinSorted
-  file "${input.baseName}.sorted.bam.bai" into hairpinSortedIndex
+  file "${hairpinAligned.baseName}.count" into hairpinCounts
+  file "${hairpinAligned.baseName}.sorted.bam" into hairpinSorted
+  file "${hairpinAligned.baseName}.sorted.bam.bai" into hairpinSortedIndex
 
   script:
   """
-  echo "${input.baseName}" >> postAlignment.log
-  samtools sort ${input.baseName}.bam -o ${input.baseName}.sorted.bam
-  samtools index ${input.baseName}.sorted.bam
-  samtools idxstats ${input.baseName}.sorted.bam > ${input.baseName}.count
+  echo "${hairpinAligned.baseName}" >> postAlignment.log
+  samtools sort ${hairpinAligned.baseName}.bam -o ${hairpinAligned.baseName}.sorted.bam
+  samtools index ${hairpinAligned.baseName}.sorted.bam
+  samtools idxstats ${hairpinAligned.baseName}.sorted.bam > ${hairpinAligned.baseName}.count
   """
 }
 
@@ -353,7 +351,7 @@ process writeJson {
 
   script:
   """
-  # awk -v name=${sortedBams.baseName} \
+  # awk -v name=${sortedBams} \
   #   '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' \
   #   > countsum.txt
   echo $counts
