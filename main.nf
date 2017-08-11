@@ -30,6 +30,15 @@
 
 version = "0.2.3"
 
+/*
+ * Helper functions
+ */
+
+String getOutDir(output_type) {
+    new File(params.output.get('base_dir', ''),
+             params.output.dirs.get(output_type, output_type)).getCanonicalPath()
+}
+
 // Configurable variables -- default values
 params.genome = false
 params.mismatches = 3
@@ -51,8 +60,6 @@ mismatches           = params.mismatches ?: 3
 if( !params.genomeAnno ){
     exit 1, "Missing hairpin reference indexes! Is --genome specified?"
 }
-
-absOutDir = file(params.outdir).getCanonicalPath()
 
 // Logging
 log.info "==========================================="
@@ -269,7 +276,7 @@ process trim_4N {
 process bowtie_hairpins {
   tag "$trimmedReads"
 
-  publishDir "${params.outdir}/bowtie/ext_hairpins", mode: "copy", pattern: '*.TCtagged_hairpin.bam'
+  publishDir path: getOutDir('rawAlignments'), mode: "copy", pattern: '*.TCtagged_hairpin.bam'
 
   input:
   file trimmedReads
@@ -306,7 +313,7 @@ def wrap_hairpin = { file ->
 process post_alignment {
   tag "$hairpinAligned"
 
-  publishDir "${params.outdir}/bowtie", mode: "copy", saveAs: wrap_hairpin
+  publishDir path: getOutDir('sortedAlignment'), mode: "copy", saveAs: wrap_hairpin
 
   input:
   file hairpinAligned
@@ -342,7 +349,7 @@ process writeJson {
   // !!!!
   // Mode needs to change to "copy" if we're going to use the json file later on
   // !!!!
-  publishDir "${params.outdir}/counting", mode: "move", pattern: '*.json'
+  publishDir path: getOutDir('json'), mode: "move", pattern: '*.json'
 
   input:
   file sortedBams from hairpinSorted.toSortedList()
