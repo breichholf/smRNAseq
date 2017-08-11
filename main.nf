@@ -52,6 +52,8 @@ if( !params.genomeAnno ){
     exit 1, "Missing hairpin reference indexes! Is --genome specified?"
 }
 
+absOutDir = file(params.outdir).getCanonicalPath()
+
 // Logging
 log.info "==========================================="
 log.info " Ameres Lab sRNAseq pipeline v${version}"
@@ -350,7 +352,6 @@ process writeJson {
   file "samples.json" into readCountConfig
 
   script:
-  outputDir = params.outdir.getCanonicalPath()
   /*
    * This portion would only be useful to extract mapped reads
    * Not incorporated right now
@@ -372,7 +373,7 @@ process writeJson {
   import os
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
-  jsDict = {"base": "${outputDir}/bowtie",
+  jsDict = {"base": "${absOutDir}/bowtie",
             "mir.anno": "$mirArmAnno"}
 
   # with open('countsum.txt', 'r') as counts:
