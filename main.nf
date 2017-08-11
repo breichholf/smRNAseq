@@ -359,6 +359,7 @@ process writeJson {
   file "samples.json" into readCountConfig
 
   script:
+  absOutDir = getOutDir('sortedAlignment')
   /*
    * This portion would only be useful to extract mapped reads
    * Not incorporated right now
