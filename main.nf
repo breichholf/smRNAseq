@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.2.2"
+version = "0.2.3"
 
 // Configurable variables -- default values
 params.genome = false
@@ -176,9 +176,9 @@ process extractHairpins {
     awk -v FS="\t" '{OFS=FS} {
         split(\$9, info, "; ")
         for (i in info){
-          if (info[i] ~ /^transcript/) {
-            split(info[i], ts, " ")
-            tsid = ts[2]
+          if (info[i] ~ /^gene_id/) {
+            split(info[i], gid, " ")
+            geneid = gid[2]
           }
         }
         strand = \$7
@@ -189,11 +189,11 @@ process extractHairpins {
           start = \$4 - 20
           end = \$5
         }
-        print \$1, start, end, tsid, 0, strand
+        print \$1, start, end, geneid, 0, strand
       }' | tr ' ' '\t' > hairpin_plus20nt.bed
     zcat -f ${genomeFastaFile} > genome.fa
     samtools faidx genome.fa
-    bedtools getfasta -s -fi genome.fa -bed hairpin_plus20nt.bed > hairpin.fa
+    bedtools getfasta -s -fi genome.fa -bed hairpin_plus20nt.bed -name > hairpin.fa
   """
 }
 
@@ -350,12 +350,21 @@ process writeJson {
   file "samples.json" into readCountConfig
 
   script:
+  outputDir = $params.outdir.getCanonicalPath
+  /*
+   * This portion would only be useful to extract mapped reads
+   * Not incorporated right now
+   *
   """
-  # awk -v name=${sortedBams} \
-  #   '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' \
-  #   > countsum.txt
-  echo $counts
+  # for f in ${counts}; do
+  #   countBase=${f/.counts/}
+  #   awk -v name=${sortedBams} \
+  #     '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' $f \
+  #     > ${countBase}_countsum.txt;
+  # done
+  # echo $counts
   """
+  */
 
   """
   #!/usr/bin/env python
@@ -363,18 +372,18 @@ process writeJson {
   import os
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
-  jsDict = {"base": "${params.outdir}/bowtie",
+  jsDict = {"base": "${outputDir}/bowtie",
             "mir.anno": "$mirArmAnno"}
 
   # with open('countsum.txt', 'r') as counts:
   #   countStats = counts.readline()
 
-  fullName, mapped, unmapped = countStats.split('\t')
+  # fullName, mapped, unmapped = countStats.split('\t')
 
   samples = []
 
-  print('Debug-STR :: {}'.format(bamfiles))
-  print('Debug-Counts :: {} - {} - {}'.format(fullName, mapped, unmapped))
+  # print('Debug-STR :: {}'.format(bamfiles))
+  # print('Debug-Counts :: {} - {} - {}'.format(fullName, mapped, unmapped))
 
   for bam in bamfiles:
     nameElements = bam.split('_')
