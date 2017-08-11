@@ -350,7 +350,7 @@ process writeJson {
   file "samples.json" into readCountConfig
 
   script:
-  outputDir = ${params.outdir}.getCanonicalPath
+  outputDir = ${params.outdir}.getCanonicalPath()
   /*
    * This portion would only be useful to extract mapped reads
    * Not incorporated right now
