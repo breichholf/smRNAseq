@@ -1,0 +1,46 @@
+#!/usr/bin/env Rscript
+
+library(dplyr)
+library(purrr)
+library(jsonlite)
+
+source("functions.R")
+
+# Command line arguments
+args = commandArgs(trailingOnly=TRUE)
+R_libs <- as.character(args[1])
+jsonFile <- as.character(args[2])
+
+setupRlibs(R_libs)
+
+cfg.info <- jsonlite::read_json(jsonFile)
+file.home <- cfg.info$base
+mir.anno <- read_tsv(cfg.info$mir.anno)
+
+cfg.samples <- dplyr::bind_rows(cfg.info$samples)
+cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
+
+allcounts <- cfg.samples %>% pmap(calc.maxpos, mirAnno = mir.anno) %>% purrr::reduce(full_join)
+
+gatheredCounts <-
+  allcounts %>%
+  gather(type, reads, matches("Reads\\.")) %>%
+  separate(type, c("read.type", "timepoint"), convert = TRUE) %>%
+  group_by(pos, flybase_id, read.type) %>%
+  mutate(average.reads = mean(reads))
+
+topPositionCounts <-
+  gatheredCounts %>%
+  group_by(arm.name) %>% top_n(1, average.reads) %>%
+  group_by(mir_name) %>%
+  mutate(mir.type = ifelse(average.reads == min(average.reads), "star", "mature")) %>%
+  ungroup()
+
+matureWide <- convertToWide(topPositionCounts, "mature")
+
+starWide <- convertToWide(topPositionCounts, "star")
+
+allcounts %>% write_tsv('allCounts.tsv')
+topPositionCounts %>% write_tsv('topPositions.tsv')
+matureWide %>% write_tsv('matureMirs.tsv')
+starWide %>% write_tsv('starMirs.tsv')
