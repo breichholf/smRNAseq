@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.2.3"
+version = "0.2.4"
 
 /*
  * Helper functions
@@ -52,7 +52,6 @@ params.rdna          = params.genome ? params.genomes[ params.genome ].ribosome 
 params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
 params.saveReference = false
 params.name          = "miRNA-Seq Best practice"
-params.outdir        = './results'
 // if params.mismatches is null, assign 3, otherwise assign mismatches
 mismatches           = params.mismatches ?: 3
 
@@ -410,3 +409,5 @@ process writeJson {
     json.dump(jsDict, fp)
   """
 }
+
+// export OMP_NUM_THREADS=$SLURM_NPROCS
