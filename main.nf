@@ -201,7 +201,7 @@ process extractHairpins {
       }' | tr ' ' '\t' > hairpin_plus20nt.bed
     zcat -f ${genomeFastaFile} > genome.fa
     samtools faidx genome.fa
-    bedtools getfasta -s -fi genome.fa -bed hairpin_plus20nt.bed -name > hairpin.fa
+    bedtools getfasta -s -name -fi genome.fa -bed hairpin_plus20nt.bed > hairpin.fa
   """
 }
 
