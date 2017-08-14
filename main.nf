@@ -249,6 +249,11 @@ process trim_adapter {
  */
 
 process trim_4N {
+  /*
+   * This relies on seqtk being installed! http://github.com/lh3/seqtk
+   * build requirements are only zlib, but cluster-env doesn't
+   * always provide this as separately loadable lib.
+   */
   tag "$acReads"
 
   input:
