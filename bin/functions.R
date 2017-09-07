@@ -111,7 +111,11 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
   require(Rsamtools)
   mapInfo <- c("rname", "strand", "pos")
   mapParams <- ScanBamParam(what = mapInfo, tag = c("TC", "TN"))
-  bam <- scanBam(align, param = mapParams)
+  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
+  filterBam <- filterBam(align, tempfile(),
+                   param = ScanBamParam(flag = scanBamFlag(isMinusStrand = F)),
+                   filter = filterNs)
+  bam <- scanBam(filterBam, param = mapParams)
   # Now this will ONLY handle files that have tags TC and TN, too!
   map.r <- dplyr::bind_cols(do.call(dplyr::bind_cols, bam[[1]][mapInfo]),
                             do.call(dplyr::bind_cols, bam[[1]]$tag))
@@ -129,16 +133,16 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
   tc.summary <-
     pos.only %>%
     group_by(rname, pos) %>%
-    filter(!is.na(TC)) %>%
+    dplry::filter(!is.na(TC)) %>%
     summarise(tcReads = n()) %>% ungroup() %>%
     mutate(flybase_id = as.character(rname)) %>%
-    select(-rname)
+    dplry::select(-rname)
 
   r.sum.pos <-
     r.summary %>%
     left_join(tc.summary, by = c("flybase_id", "pos")) %>%
     left_join(mirAnno, by = "flybase_id") %>%
-    select(-rname, -loop)
+    dplry::select(-rname, -loop)
 
   r.sum.arms <-
     r.sum.pos %>%
@@ -156,7 +160,7 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
     top_n(n = 5, wt = count) %>% ungroup() %>%
     mutate(count = count / sRNAreads * 1000000,
            tcReads = tcReads / sRNAreads * 1000000) %>%
-    rename_(.dots = setNames(c("count", "tcReads"), c(countName, tcName)))
+    dplry::rename_(.dots = setNames(c("count", "tcReads"), c(countName, tcName)))
 
   return(r.sum.max.pos)
 }
@@ -167,15 +171,15 @@ convertToWide <- function(gatheredAllCounts, mirType) {
 
   output <-
     gatheredAllCounts %>%
-    filter(mir.type == !!mirType) %>%
+    dplry::filter(mir.type == !!mirType) %>%
     mutate(arm.name = fct_reorder(arm.name, desc(average.reads))) %>%
-    select(arm.name, pos, timepoint, reads) %>%
+    dplry::select(arm.name, pos, timepoint, reads) %>%
     spread(timepoint, reads)
 
   return(output)
 }
 
-fetchPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, ...) {
+mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, ...) {
   require(tibble)
   require(dplyr)
   require(stringr)
@@ -188,7 +192,7 @@ fetchPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, ...) {
     separate(ref.seq, paste("Pos", 1:str_length(full.seq), sep = "_"), sep = "\\B") %>%
     gather(pos, refNuc, matches("Pos_")) %>%
     separate(pos, c("pos", "idx"), sep = "_", convert = TRUE) %>%
-    select(-pos)
+    dplry::select(-pos)
 
   # Get pileup
   pileupParams <- PileupParam(query_bins = seq(0,30), max_depth=10000000, min_mapq=0, min_base_quality=0)
@@ -213,13 +217,13 @@ fetchPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, ...) {
   # Filter pileup to only get reads starting at our desired start position
   filteredRes <-
     pileupResult %>%
-    select(-which_label, -strand) %>%
+    dplry::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
            seqnames = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint) %>%
-    select(-query_bin) %>%
+    dplry::select(-query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= mirBodyLength) %>%
-    rename(flybase_id = seqnames) %>%
+    dplry::rename(flybase_id = seqnames) %>%
     left_join(refSeqWpos, by = c("flybase_id", "pos" = "idx")) # Merge in `refSeqWpos` from above
 
   return(filteredRes)

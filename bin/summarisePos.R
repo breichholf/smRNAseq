@@ -3,6 +3,7 @@
 library(dplyr)
 library(purrr)
 library(jsonlite)
+library(tidyr)
 
 source("functions.R")
 
@@ -26,6 +27,7 @@ gatheredCounts <-
   allcounts %>%
   gather(type, reads, matches("Reads\\.")) %>%
   separate(type, c("read.type", "timepoint"), convert = TRUE) %>%
+  replace_na(list(reads = 0)) %>%
   group_by(pos, flybase_id, read.type) %>%
   mutate(average.reads = mean(reads))
 
@@ -41,6 +43,7 @@ matureWide <- convertToWide(topPositionCounts, "mature")
 starWide <- convertToWide(topPositionCounts, "star")
 
 allcounts %>% write_tsv('allCounts.tsv')
+gatheredCounts %>% write_tsv('gatheredCounts.tsv')
 topPositionCounts %>% write_tsv('topPositions.tsv')
 matureWide %>% write_tsv('matureMirs.tsv')
 starWide %>% write_tsv('starMirs.tsv')

@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.2.4"
+version = "0.3"
 
 /*
  * Helper functions
@@ -60,6 +60,11 @@ if( !params.genomeAnno ){
     exit 1, "Missing hairpin reference indexes! Is --genome specified?"
 }
 
+// R library locations
+params.rlocation = "$HOME/R/nxtflow_libs/"
+nxtflow_libs=file(params.rlocation)
+nxtflow_libs.mkdirs()
+
 // Logging
 log.info "==========================================="
 log.info " Ameres Lab sRNAseq pipeline v${version}"
@@ -71,6 +76,7 @@ log.info "Mismatches           : ${mismatches}"
 log.info "Current user         : $USER"
 log.info "Current path         : $PWD"
 log.info "Script dir           : $baseDir"
+log.info "R location           : ${params.rlocation}"
 log.info "Output dir           : ${params.outdir}"
 log.info "Config Profile       : ${workflow.profile}"
 log.info "==========================================="
@@ -265,10 +271,7 @@ process trim_4N {
   script:
   prefix = acReads.toString() - ".adapter_clipped.fq.gz"
   """
-  seqtk trimfq \\
-    -b 4 \\
-    -e 4 \\
-    $acReads > trimmedReads.fq
+  seqtk trimfq -b 4 -e 4 $acReads > trimmedReads.fq
 
   gzip -c trimmedReads.fq > ${prefix}.trimmed.fq.gz
   """
@@ -336,6 +339,10 @@ process post_alignment {
   """
 }
 
+/*
+ *  STEP 5: Postprocessing (Prepare JSON)
+ */
+
 process writeJson {
   /*
    * INFO:
@@ -353,7 +360,7 @@ process writeJson {
   // !!!!
   // Mode needs to change to "copy" if we're going to use the json file later on
   // !!!!
-  publishDir path: getOutDir('json'), mode: "move", pattern: '*.json'
+  publishDir path: getOutDir('json'), mode: "copy", pattern: '*.json'
 
   input:
   file sortedBams from hairpinSorted.toSortedList()
@@ -415,4 +422,37 @@ process writeJson {
   """
 }
 
-// export OMP_NUM_THREADS=$SLURM_NPROCS
+process alignmentStats {
+
+  publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
+
+  input:
+  file readCountConfig
+
+  output:
+  file 'gatheredCounts.tsv' into alignStats
+
+  script:
+  """
+  export OMP_NUM_THREADS=$SLURM_NPROCS
+  summarisePos.R ${params.rlocation} $readCountConfig
+  """
+}
+
+process mutationStats {
+  publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.{tsv,pdf}"
+
+  input:
+  file readCountConfig
+  file alignStats
+  file hairpinFasta
+
+  output:
+  file 'mutationCounts.tsv' into mutStats
+
+  script:
+  """
+  export OMP_NUM_THREADS=$SLURM_NPROCS
+  getMutationsFromBAM.R ${params.rlocation} $readCountConfig $alignStats $hairpinFasta
+  """
+}
