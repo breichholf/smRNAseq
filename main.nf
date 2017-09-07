@@ -340,7 +340,7 @@ process post_alignment {
 }
 
 /*
- *  STEP 5: Postprocessing (Prepare JSON)
+ *  STEP 5a: Postprocessing -- Prepare JSON configuration
  */
 
 process writeJson {

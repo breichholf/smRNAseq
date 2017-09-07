@@ -1,10 +1,5 @@
 #!/usr/bin/env Rscript
 
-library(dplyr)
-library(purrr)
-library(jsonlite)
-library(tidyr)
-
 source("functions.R")
 
 # Command line arguments
@@ -13,6 +8,11 @@ R_libs <- as.character(args[1])
 jsonFile <- as.character(args[2])
 
 setupRlibs(R_libs)
+
+library(dplyr)
+library(purrr)
+library(jsonlite)
+library(tidyr)
 
 cfg.info <- jsonlite::read_json(jsonFile)
 file.home <- cfg.info$base
