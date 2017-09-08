@@ -435,7 +435,7 @@ process alignmentStats {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  summarisePos.R ${params.rlocation} $readCountConfig
+  summarisePos.R $baseDir ${params.rlocation} $readCountConfig
   """
 }
 
@@ -453,6 +453,6 @@ process mutationStats {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  getMutationsFromBAM.R ${params.rlocation} $readCountConfig $alignStats $hairpinFasta
+  getMutationsFromBAM.R $baseDir ${params.rlocation} $readCountConfig $alignStats $hairpinFasta
   """
 }

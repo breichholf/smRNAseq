@@ -1,11 +1,12 @@
 #!/usr/bin/env Rscript
 
-source(file.path(".", "functions.R"))
-
 # Command line arguments
 args = commandArgs(trailingOnly=TRUE)
-R_libs <- as.character(args[1])
-jsonFile <- as.character(args[2])
+scriptDir <- as.character(args[1])
+R_libs <- as.character(args[2])
+jsonFile <- as.character(args[3])
+
+source(file.path(scriptDir, "bin/functions.R"))
 
 setupRlibs(R_libs)
 
