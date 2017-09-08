@@ -20,6 +20,10 @@ setupRlibs <- function(R_lib){
     install.packages("purrr", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }
 
+  if (!require("readr")){
+    install.packages("readr", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  }
+
   if (!require("tibble")) {
     install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }

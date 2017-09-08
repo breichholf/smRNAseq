@@ -14,6 +14,7 @@ library(dplyr)
 library(purrr)
 library(jsonlite)
 library(tidyr)
+library(readr)
 
 cfg.info <- jsonlite::read_json(jsonFile)
 file.home <- cfg.info$base
