@@ -392,7 +392,7 @@ process writeJson {
   import os
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
-  jsDict = {"base": "${absOutDir}/bowtie",
+  jsDict = {"base": "${absOutDir}/ext_hairpins",
             "mir.anno": "$mirArmAnno"}
 
   # with open('countsum.txt', 'r') as counts:
