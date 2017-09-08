@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-source("functions.R")
+source(file.path(".", "functions.R"))
 
 # Command line arguments
 args = commandArgs(trailingOnly=TRUE)
@@ -40,6 +40,10 @@ topMirMuts <-
   topMirCounts %>%
   pmap_dfr(mutsFromPileup)
 
+# topMirMutsWarms <-
+#   topMirMuts %>%
+#   left_join(mir.anno, by = )
+
 topMirMutCodes <-
   topMirMuts %>%
   spread(nucleotide, count) %>%
@@ -65,3 +69,4 @@ mirMutsWide <-
   spread(relMut, mutFract)
 
 topMirMutCodes %>% write_tsv('mutstats.tsv')
+mirMutsWide %>% write_tsv('allMirMuts.tsv')

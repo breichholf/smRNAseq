@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-source("functions.R")
+source(file.path(".", "functions.R"))
 
 # Command line arguments
 args = commandArgs(trailingOnly=TRUE)
