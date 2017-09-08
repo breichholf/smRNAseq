@@ -114,11 +114,10 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
   require(stringr)
   require(Rsamtools)
   mapInfo <- c("rname", "strand", "pos")
-  mapParams <- ScanBamParam(what = mapInfo, tag = c("TC", "TN"))
+  mapParams <- ScanBamParam(what = mapInfo, tag = c("TC", "TN"),
+                            flag = scanBamFlag(isMinusStrand = F))
   filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
-  filterBam <- filterBam(align, tempfile(),
-                   param = ScanBamParam(flag = scanBamFlag(isMinusStrand = F)),
-                   filter = filterNs)
+  filterBam <- filterBam(align, tempfile(), filter = filterNs)
   bam <- scanBam(filterBam, param = mapParams)
   # Now this will ONLY handle files that have tags TC and TN, too!
   map.r <- dplyr::bind_cols(do.call(dplyr::bind_cols, bam[[1]][mapInfo]),
