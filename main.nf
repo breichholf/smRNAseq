@@ -434,7 +434,7 @@ process alignmentStats {
 
   script:
   """
-  export OMP_NUM_THREADS=\$SLURM_NPROCS
+  export OMP_NUM_THREADS=${task.cpus}
   summarisePos.R ${params.rlocation} $readCountConfig
   """
 }
@@ -452,7 +452,7 @@ process mutationStats {
 
   script:
   """
-  export OMP_NUM_THREADS=\$SLURM_NPROCS
+  export OMP_NUM_THREADS=${task.cpus}
   getMutationsFromBAM.R ${params.rlocation} $readCountConfig $alignStats $hairpinFasta
   """
 }
