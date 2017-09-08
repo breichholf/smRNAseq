@@ -1,4 +1,4 @@
-setupRLibs <- function(R_lib){
+setupRlibs <- function(R_lib){
 
   .libPaths( c( .libPaths(), R_lib ) )
 
