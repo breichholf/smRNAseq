@@ -16,6 +16,10 @@ setupRlibs <- function(R_lib){
     install.packages("stringr", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }
 
+  if (!require("forcats")){
+    install.packages("forcats", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  }
+
   if (!require("purrr")){
     install.packages("purrr", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }
@@ -170,6 +174,7 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
 
 convertToWide <- function(gatheredAllCounts, mirType) {
   require(dplyr)
+  require(forcats)
   mirType <- enquo(mirType)
 
   output <-
