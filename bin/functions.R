@@ -136,16 +136,16 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
   tc.summary <-
     pos.only %>%
     group_by(rname, pos) %>%
-    dplry::filter(!is.na(TC)) %>%
+    dplyr::filter(!is.na(TC)) %>%
     summarise(tcReads = n()) %>% ungroup() %>%
     mutate(flybase_id = as.character(rname)) %>%
-    dplry::select(-rname)
+    dplyr::select(-rname)
 
   r.sum.pos <-
     r.summary %>%
     left_join(tc.summary, by = c("flybase_id", "pos")) %>%
     left_join(mirAnno, by = "flybase_id") %>%
-    dplry::select(-rname, -loop)
+    dplyr::select(-rname, -loop)
 
   r.sum.arms <-
     r.sum.pos %>%
@@ -163,7 +163,7 @@ calc.maxpos <- function(id, align, sRNAreads, mirAnno = NULL, ...) {
     top_n(n = 5, wt = count) %>% ungroup() %>%
     mutate(count = count / sRNAreads * 1000000,
            tcReads = tcReads / sRNAreads * 1000000) %>%
-    dplry::rename_(.dots = setNames(c("count", "tcReads"), c(countName, tcName)))
+    dplyr::rename_(.dots = setNames(c("count", "tcReads"), c(countName, tcName)))
 
   return(r.sum.max.pos)
 }
@@ -174,9 +174,9 @@ convertToWide <- function(gatheredAllCounts, mirType) {
 
   output <-
     gatheredAllCounts %>%
-    dplry::filter(mir.type == !!mirType) %>%
+    dplyr::filter(mir.type == !!mirType) %>%
     mutate(arm.name = fct_reorder(arm.name, desc(average.reads))) %>%
-    dplry::select(arm.name, pos, timepoint, reads) %>%
+    dplyr::select(arm.name, pos, timepoint, reads) %>%
     spread(timepoint, reads)
 
   return(output)
@@ -195,7 +195,7 @@ mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, ...) {
     separate(ref.seq, paste("Pos", 1:str_length(full.seq), sep = "_"), sep = "\\B") %>%
     gather(pos, refNuc, matches("Pos_")) %>%
     separate(pos, c("pos", "idx"), sep = "_", convert = TRUE) %>%
-    dplry::select(-pos)
+    dplyr::select(-pos)
 
   # Get pileup
   pileupParams <- PileupParam(query_bins = seq(0,30), max_depth=10000000, min_mapq=0, min_base_quality=0)
@@ -220,13 +220,13 @@ mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, ...) {
   # Filter pileup to only get reads starting at our desired start position
   filteredRes <-
     pileupResult %>%
-    dplry::select(-which_label, -strand) %>%
+    dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
            seqnames = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint) %>%
-    dplry::select(-query_bin) %>%
+    dplyr::select(-query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= mirBodyLength) %>%
-    dplry::rename(flybase_id = seqnames) %>%
+    dplyr::rename(flybase_id = seqnames) %>%
     left_join(refSeqWpos, by = c("flybase_id", "pos" = "idx")) # Merge in `refSeqWpos` from above
 
   return(filteredRes)
