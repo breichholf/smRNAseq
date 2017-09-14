@@ -16,6 +16,8 @@ library(jsonlite)
 library(tidyr)
 library(readr)
 
+sessionInfo()
+
 cfg.info <- jsonlite::read_json(jsonFile)
 file.home <- cfg.info$base
 mir.anno <- read_tsv(cfg.info$mir.anno)

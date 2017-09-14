@@ -17,6 +17,8 @@ library(purrr)
 library(jsonlite)
 library(readr)
 
+sessionInfo()
+
 cfg.info <- jsonlite::read_json(jsonFile)
 file.home <- cfg.info$base
 mir.anno <- read_tsv(cfg.info$mir.anno)

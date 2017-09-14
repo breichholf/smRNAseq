@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.3"
+version = "0.3.1"
 
 /*
  * Helper functions
