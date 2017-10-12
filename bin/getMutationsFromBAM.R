@@ -26,23 +26,31 @@ mir.anno <- read_tsv(cfg.info$mir.anno)
 cfg.samples <- dplyr::bind_rows(cfg.info$samples)
 cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
 
-gatheredCounts <- read_tsv(gatherFile)
+topPositions <- read_tsv(topPosFile)
 
 preMirFasta <- readDNAStringSet(preMirFastaFile)
 preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = paste(preMirFasta)))
 
+mirBodyLength <- 18
+
 topMirCounts <-
-  gatheredCounts %>%
+  topPositions %>%
   left_join(cfg.samples, by = c('timepoint' = 'id')) %>%
   mutate(bamFile = file.path(file.home, align)) %>%
-  group_by(arm.name) %>%
-  top_n(1, average.reads) %>%
-  ungroup() %>%
   left_join(preMirTbl)
 
-topMirMuts <-
+topMirs <-
   topMirCounts %>%
-  pmap_dfr(mutsFromPileup)
+  pmap_dfr(mutsFromPileup, minLen = mirBodyLength)
+
+topMirMuts <-
+  topMirs %>%
+  filter(relPos <= mirBodyLength) %>%
+  dplyr::select(-lenCount)
+
+topMirLens <-
+  topMirs %>%
+  filter(relPos >= mirBodyLength) %>%
 
 # topMirMutsWarms <-
 #   topMirMuts %>%

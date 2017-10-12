@@ -73,6 +73,7 @@ log.info "Reads                : ${params.reads}"
 if (params.genome) log.info "Genome               : ${params.genome}"
 log.info "Genome Annotation    : ${params.genomeAnno}"
 log.info "Mismatches           : ${mismatches}"
+log.info "sRNA annotated reads : ${params.annoreads}"
 log.info "Current user         : $USER"
 log.info "Current path         : $PWD"
 log.info "Script dir           : $baseDir"
@@ -100,6 +101,11 @@ if ( !params.genomeAnno || !genomeAnno.exists() ) {
 if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
   exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
 }
+
+readcounts      = file(params.annoreads)
+
+// We need to put a check in here, to set read counts to 10000000 or so.
+if (!readcounts.exists()) exit 1, "Read counts not provided."
 
 /* This allows passing wild card tagged files on CLI:
  * `--reads <file*.x>`
@@ -365,6 +371,7 @@ process writeJson {
   input:
   file sortedBams from hairpinSorted.toSortedList()
   file counts from hairpinCounts.toSortedList()
+  file readcounts
 
   output:
   file "samples.json" into readCountConfig
@@ -390,10 +397,13 @@ process writeJson {
   #!/usr/bin/env python
   import json
   import os
+  import pandas as pd
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
   jsDict = {"base": "${absOutDir}/ext_hairpins",
             "mir.anno": "$mirArmAnno"}
+
+  readCounts = pd.read_table("$readcounts")
 
   # with open('countsum.txt', 'r') as counts:
   #   countStats = counts.readline()
@@ -408,7 +418,8 @@ process writeJson {
   for bam in bamfiles:
     nameElements = bam.split('_')
     idx = int(nameElements[0])
-    sRNAreads = 1000000
+    # sRNAreads = 1000000
+    sRNAreads = readCounts[readCounts.idx == idx]['sRNAreads'].values[0]
     samples.append({"id": idx,
                     "time": str(idx) + "h",
                     "align": bam,
@@ -430,7 +441,7 @@ process alignmentStats {
   file readCountConfig
 
   output:
-  file 'gatheredCounts.tsv' into alignStats
+  file 'topPositions.tsv' into alignStats
 
   script:
   """
