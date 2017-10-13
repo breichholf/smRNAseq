@@ -5,7 +5,7 @@ args <- commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
 R_libs <- as.character(args[2])
 jsonFile <- as.character(args[3])
-gatherFile <- as.character(args[4])
+topPosFile <- as.character(args[4])
 preMirFastaFile <- as.character(args[5])
 
 source(file.path(scriptDir, "bin/functions.R"))
