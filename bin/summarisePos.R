@@ -32,16 +32,24 @@ gatheredCounts <-
   select(-matches("LenDis"), -seqLen) %>%
   gather(type, reads, matches("Reads\\.")) %>%
   separate(type, c("read.type", "timepoint"), convert = TRUE) %>%
-  replace_na(list(reads = 0)) %>% distinct() %>%
-  group_by(pos, flybase_id, read.type) %>%
-  mutate(average.reads = mean(reads))
+  replace_na(list(reads = 0)) %>% distinct()
 
 topPositionCounts <-
   gatheredCounts %>%
-  group_by(arm.name) %>% top_n(1, average.reads) %>%
+  dplyr::filter(read.type == "totalReads") %>%
+  group_by(pos, flybase_id) %>%
+    mutate(average.reads = mean(reads)) %>%
+  group_by(arm.name) %>%
+    top_n(1, average.reads) %>%
   group_by(mir_name) %>%
-  mutate(mir.type = ifelse(average.reads == max(average.reads), "mature", "star")) %>%
-  ungroup() %>% filter(read.type == "totalReads")
+    mutate(mir.type = ifelse(average.reads == max(average.reads), "mature", "star")) %>%
+  ungroup()
+
+topTcReads <-
+  gatheredCounts %>%
+  dplyr::filter(read.type != "totalReads") %>%
+  left_join(topPositionCounts %>% select(flybase_id, pos, mir.type)) %>%
+  dplyr::filter(!is.na(mir.type))
 
 gatheredLenDis <-
   allcounts %>%
@@ -50,15 +58,25 @@ gatheredLenDis <-
   separate(type, c("LD.type", "timepoint"), convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
   left_join(topPositionCounts %>% select(flybase_id, pos, mir.type)) %>%
-  filter(!is.na(mir.type))
+  dplyr::filter(!is.na(mir.type))
 
-matureWide <- convertToWide(topPositionCounts, "mature")
+totalLenDis <-
+  gatheredLenDis %>%
+  dplyr::filter(LD.type == "totalLenDis")
 
-starWide <- convertToWide(topPositionCounts, "star")
+tcLenDis <-
+  gatheredLenDis %>%
+  dplyr::filter(LD.type == "tcLenDis")
+
+# matureWide <- convertToWide(topPositionCounts, "mature")
+
+# starWide <- convertToWide(topPositionCounts, "star")
 
 allcounts %>% write_tsv('allCounts.tsv')
 gatheredCounts %>% write_tsv('gatheredCounts.tsv')
-gatheredLenDis %>% write_tsv('gatheredLenDis.tsv')
-topPositionCounts %>% write_tsv('topPositions.tsv')
-matureWide %>% write_tsv('matureMirs.tsv')
-starWide %>% write_tsv('starMirs.tsv')
+totalLenDis %>% write_tsv('totalLenDis.tsv')
+tcLenDis %>% write_tsv('tcLenDis.tsv')
+topPositionCounts %>% write_tsv('topPositionCounts.tsv')
+topTcReads %>% write_tsv('topTcReads.txt')
+# matureWide %>% write_tsv('matureMirs.tsv')
+# starWide %>% write_tsv('starMirs.tsv')
