@@ -441,7 +441,7 @@ process alignmentStats {
   file readCountConfig
 
   output:
-  file 'topPositions.tsv' into alignStats
+  file 'topPositionCounts.tsv' into alignStats
 
   script:
   """
