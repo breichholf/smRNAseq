@@ -45,7 +45,7 @@ topMirs <-
 
 topMirMuts <-
   topMirs %>%
-  filter(relPos <= mirBodyLength) %>%
+  dplyr::filter(relPos <= mirBodyLength) %>%
   dplyr::select(-lenCount)
 
 topMirLens <-
@@ -65,19 +65,20 @@ topMirMutCodes <-
                           paste(refNuc, nucleotide, sep = ">"),
                           refNuc)) %>%
   group_by(flybase_id, timepoint, pos) %>%
-  mutate(depth = sum(count), mutFract = count / depth) %>%
-  filter(grepl(">", mutCode)) %>%
-  arrange(flybase_id, timepoint, relPos, mutCode) %>% ungroup()
+    mutate(depth = sum(count), mutFract = count / depth) %>%
+    dplyr::filter(grepl(">", mutCode)) %>%
+    arrange(flybase_id, timepoint, relPos, mutCode) %>%
+  ungroup()
 
 mirMutsWide <-
   topMirMutCodes %>%
   group_by(flybase_id, timepoint) %>%
-  mutate(start.pos = min(pos)) %>%
+    mutate(start.pos = min(pos)) %>%
   group_by(flybase_id, timepoint, mutCode) %>%
-  mutate(relMutCount = rank(relPos)) %>%
-  mutate(relMut = paste(mutCode, relMutCount, sep = "_"),
-         relMut = str_replace(relMut, ">", "")) %>% ungroup() %>%
-  select(flybase_id, timepoint, start.pos, depth, mutFract, relMut) %>%
+    mutate(relMutCount = rank(relPos)) %>%
+    mutate(relMut = paste(mutCode, relMutCount, sep = "_"),
+           relMut = str_replace(relMut, ">", "")) %>% ungroup() %>%
+    dplyr::select(flybase_id, timepoint, start.pos, depth, mutFract, relMut) %>%
   spread(relMut, mutFract)
 
 topMirMutCodes %>% write_tsv('mutstats.tsv')
