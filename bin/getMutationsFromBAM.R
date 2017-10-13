@@ -37,7 +37,7 @@ mirBodyLength <- 18
 topMirCounts <-
   topPositions %>%
   left_join(cfg.samples, by = c('timepoint' = 'id')) %>%
-  mutate(bamFile = file.path(file.home, align)) %>%
+  mutate(bamFile = file.path(align)) %>%
   left_join(preMirTbl)
 
 topMirs <-
