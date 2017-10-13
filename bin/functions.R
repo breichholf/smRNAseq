@@ -32,6 +32,10 @@ setupRlibs <- function(R_lib){
     install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }
 
+  if (!require("tidyr")) {
+    install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  }
+
   if (!require("cowplot")) {
     install.packages("cowplot", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }

@@ -16,6 +16,7 @@ library(dplyr)
 library(purrr)
 library(jsonlite)
 library(readr)
+library(tidyr)
 
 sessionInfo()
 
