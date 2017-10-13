@@ -229,7 +229,7 @@ mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen
   pileupResult <- pileup(filterBam, scanBamParam = scanParams, pileupParam = pileupParams)
 
   # Filter pileup to only get reads starting at our desired start position
-  totalPileup <-
+  filteredRes <-
     pileupResult %>%
     dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
@@ -237,18 +237,8 @@ mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen
            timepoint = timepoint) %>%
     dplyr::rename(flybase_id = seqnames) %>%
     dplyr::select(-query_bin) %>%
-    dplyr::filter(relPos == pos - min(pos) + 1) %>%
+    dplyr::filter(relPos == pos - min(pos) + 1, relPos <= minLen) %>%
     left_join(refSeqWpos, by = c("flybase_id", "pos" = "idx")) # Merge in `refSeqWpos` from above
-
-  lenDis <-
-    totalPileup %>%
-    group_by(relPos) %>%
-    dplyr::filter(relPos >= minLen) %>%
-    summarise(pSum = sum(count)) %>%
-    mutate(lCount = pSum - lead(pSum, default = 0)) %>%
-    dplyr::select(-pSum)
-
-  filteredRes <- left_join(totalPileup, lenDis)
 
   return(filteredRes)
 }
