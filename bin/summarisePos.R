@@ -32,7 +32,10 @@ gatheredCounts <-
   select(-matches("LenDis"), -seqLen) %>%
   gather(type, reads, matches("Reads\\.")) %>%
   separate(type, c("read.type", "timepoint"), convert = TRUE) %>%
-  replace_na(list(reads = 0)) %>% distinct()
+  replace_na(list(reads = 0)) %>%
+  group_by(flybase_id, pos, read.type, timepoint) %>%
+    filter(reads == max(reads)) %>%
+  ungroup()
 
 topPositionCounts <-
   gatheredCounts %>%
