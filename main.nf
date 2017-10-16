@@ -454,7 +454,7 @@ process alignmentStats {
 }
 
 process mutationStats {
-  publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.{tsv,pdf}"
+  publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:
   file readCountConfig
@@ -463,6 +463,7 @@ process mutationStats {
 
   output:
   file 'mutationCounts.tsv' into mutStats
+  file 'allMirMuts.tsv' into mirMuts
 
   script:
   """
