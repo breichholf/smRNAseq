@@ -442,6 +442,9 @@ process alignmentStats {
 
   output:
   file 'topPositionCounts.tsv' into alignStats
+  file '*Counts.tsv' into countTSV
+  file '*LenDis.tsv' into lendisTSV
+  file '*TcReads.tsv' into tcReads
 
   script:
   """

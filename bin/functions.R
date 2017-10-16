@@ -235,8 +235,7 @@ mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen
     mutate(relPos = as.numeric(query_bin),
            flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint) %>%
-    dplyr::rename(flybase_id = seqnames) %>%
-    dplyr::select(-query_bin) %>%
+    dplyr::select(-seqnames, -query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= minLen) %>%
     left_join(refSeqWpos, by = c("flybase_id", "pos" = "idx")) # Merge in `refSeqWpos` from above
 

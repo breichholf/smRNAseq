@@ -51,7 +51,7 @@ topMirMuts <-
 
 topMirLens <-
   topMirs %>%
-  filter(relPos >= mirBodyLength) %>%
+  dplyr::filter(relPos >= mirBodyLength) %>%
 
 # topMirMutsWarms <-
 #   topMirMuts %>%
