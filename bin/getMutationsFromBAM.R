@@ -17,6 +17,7 @@ library(purrr)
 library(jsonlite)
 library(readr)
 library(tidyr)
+library(Biostrings)
 
 sessionInfo()
 
