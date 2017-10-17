@@ -181,6 +181,7 @@ Channel
 
 process extractHairpins {
   tag "genomePrep"
+  publishDir path: getOutDir('ref'), mode: "copy", pattern: 'hairpin*.{fa,bed}'
 
   input:
   file genomeFastaFile
@@ -188,6 +189,7 @@ process extractHairpins {
 
   output:
   file "hairpin.fa" into hairpinFasta
+  file "hairpin_plus20nt.bed" into hairpinBED
 
   script:
   """
@@ -236,6 +238,7 @@ process makeIndex {
 // Clip 3' Adapter using cutadapt
 process trim_adapter {
   tag "$reads"
+  publishDir path: getOutDir('reports'), mode: "copy", pattern: '*.trim_report.txt'
 
   input:
   file reads from rawReads
