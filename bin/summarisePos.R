@@ -51,7 +51,7 @@ topPositionCounts <-
 topTcReads <-
   gatheredCounts %>%
   dplyr::filter(read.type != "totalReads") %>%
-  left_join(topPositionCounts %>% select(flybase_id, pos, mir.type)) %>%
+  left_join(topPositionCounts %>% select(flybase_id, pos, timepoint, mir.type)) %>%
   dplyr::filter(!is.na(mir.type))
 
 gatheredLenDis <-
@@ -60,7 +60,7 @@ gatheredLenDis <-
   gather(type, reads, matches("LenDis")) %>%
   separate(type, c("LD.type", "timepoint"), convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
-  left_join(topPositionCounts %>% select(flybase_id, pos, mir.type)) %>%
+  left_join(topPositionCounts %>% select(flybase_id, pos, timepoint, mir.type)) %>%
   dplyr::filter(!is.na(mir.type))
 
 totalLenDis <-

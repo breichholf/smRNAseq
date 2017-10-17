@@ -47,23 +47,15 @@ topMirCutoff <-
 
 topMirs <-
   topMirCutoff %>%
-  pmap_dfr(mutsFromPileup, minLen = mirBodyLength)
-
-topMirMuts <-
-  topMirs %>%
-  dplyr::filter(relPos <= mirBodyLength) %>%
-  dplyr::select(-lenCount)
-
-topMirLens <-
-  topMirs %>%
-  dplyr::filter(relPos >= mirBodyLength) %>%
+  pmap_dfr(mutsFromPileup, minLen = mirBodyLength) %>%
+  dplyr::filter(relPos <= mirBodyLength)
 
 # topMirMutsWarms <-
 #   topMirMuts %>%
 #   left_join(mir.anno, by = )
 
 topMirMutCodes <-
-  topMirMuts %>%
+  topMirs %>%
   spread(nucleotide, count) %>%
   replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
   gather(nucleotide, count, A:T) %>%
