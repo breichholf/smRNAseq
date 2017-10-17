@@ -462,7 +462,7 @@ process mutationStats {
   file hairpinFasta
 
   output:
-  file 'mutationCounts.tsv' into mutStats
+  file 'mutStats.tsv' into mutStats
   file 'allMirMuts.tsv' into mirMuts
 
   script:

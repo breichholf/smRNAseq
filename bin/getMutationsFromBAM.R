@@ -40,8 +40,12 @@ topMirCounts <-
   mutate(bamFile = file.path(align)) %>%
   left_join(preMirTbl)
 
-topMirs <-
+topMirCutoff <-
   topMirCounts %>%
+  dplyr::filter(average.reads >= 50)
+
+topMirs <-
+  topMirCutoff %>%
   pmap_dfr(mutsFromPileup, minLen = mirBodyLength)
 
 topMirMuts <-
@@ -82,5 +86,5 @@ mirMutsWide <-
     dplyr::select(flybase_id, timepoint, start.pos, depth, mutFract, relMut) %>%
   spread(relMut, mutFract)
 
-topMirMutCodes %>% write_tsv('mutstats.tsv')
+topMirMutCodes %>% write_tsv('mutStats.tsv')
 mirMutsWide %>% write_tsv('allMirMuts.tsv')

@@ -35,7 +35,7 @@ gatheredCounts <-
   replace_na(list(reads = 0)) %>%
   group_by(flybase_id, pos, read.type, timepoint) %>%
     filter(reads == max(reads)) %>%
-  ungroup()
+  ungroup() %>% distinct()
 
 topPositionCounts <-
   gatheredCounts %>%
