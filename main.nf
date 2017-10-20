@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.4.3"
+version = "0.4.4"
 
 /*
  * Helper functions
@@ -205,7 +205,7 @@ process extractHairpins {
         }
         strand = \$7
         if (strand == "+") {
-          start = \$4
+          start = \$4 - 1    # GTF start coordinate is 1 based, BED is 0-based!
           end = \$5 + 20
         } else {
           start = \$4 - 20
@@ -442,20 +442,28 @@ process alignmentStats {
 
   input:
   file readCountConfig
+  file hairpinFasta
 
   output:
   file 'topPositionCounts.tsv' into alignStats
   file '*Counts.tsv' into countTSV
   file '*LenDis.tsv' into lendisTSV
   file '*TcReads.tsv' into tcReads
+  file 'bgSub*.tsv' into bgSubtracted
 
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  summarisePos.R $baseDir ${params.rlocation} $readCountConfig
+  summarisePos.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
+  spreadReads.R allCounts.tsv topPositionCounts.tsv ./
   """
 }
 
+/*
+  Purrr runs 'in parallel', but only on one core.
+  Incorporate `BiocParallel`, to run across as many cores as we're requesting,
+  THEN readd.
+*//*
 process mutationStats {
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
@@ -474,3 +482,4 @@ process mutationStats {
   getMutationsFromBAM.R $baseDir ${params.rlocation} $readCountConfig $alignStats $hairpinFasta
   """
 }
+*/

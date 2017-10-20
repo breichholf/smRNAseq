@@ -5,6 +5,7 @@ args = commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
 R_libs <- as.character(args[2])
 jsonFile <- as.character(args[3])
+preMirFastaFile <- as.character(args[4])
 
 source(file.path(scriptDir, "bin/functions.R"))
 
@@ -15,6 +16,7 @@ library(purrr)
 library(jsonlite)
 library(tidyr)
 library(readr)
+library(stringr)
 
 sessionInfo()
 
@@ -24,6 +26,11 @@ mir.anno <- read_tsv(cfg.info$mir.anno)
 
 cfg.samples <- dplyr::bind_rows(cfg.info$samples)
 cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
+
+preMirFasta <- readDNAStringSet(preMirFastaFile)
+preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = paste(preMirFasta)))
+
+mirBodyLength <- 18
 
 allcounts <- cfg.samples %>% pmap(get.top.startpos, mirAnno = mir.anno) %>% purrr::reduce(full_join)
 
@@ -48,10 +55,18 @@ topPositionCounts <-
     mutate(mir.type = ifelse(average.reads == max(average.reads), "mature", "star")) %>%
   ungroup()
 
+topPosCntsWseed <-
+  topPositionCounts %>%
+  left_join(preMirTbl) %>%
+  mutate(seed = str_sub(full.seq, pos, pos + 7),
+         mirBody = str_sub(full.seq, pos, pos + mirBodyLength - 1),
+         UCount = str_count(mirBody, "T")) %>%
+  select(-mirBody, -full.seq)
+
 topTcReads <-
   gatheredCounts %>%
   dplyr::filter(read.type != "totalReads") %>%
-  left_join(topPositionCounts %>% select(flybase_id, pos, timepoint, mir.type)) %>%
+  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, mir.type)) %>%
   dplyr::filter(!is.na(mir.type))
 
 gatheredLenDis <-
@@ -60,7 +75,7 @@ gatheredLenDis <-
   gather(type, reads, matches("LenDis")) %>%
   separate(type, c("LD.type", "timepoint"), convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
-  left_join(topPositionCounts %>% select(flybase_id, pos, timepoint, mir.type)) %>%
+  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, mir.type)) %>%
   dplyr::filter(!is.na(mir.type))
 
 totalLenDis <-
@@ -79,7 +94,7 @@ allcounts %>% write_tsv('allCounts.tsv')
 gatheredCounts %>% write_tsv('gatheredCounts.tsv')
 totalLenDis %>% write_tsv('totalLenDis.tsv')
 tcLenDis %>% write_tsv('tcLenDis.tsv')
-topPositionCounts %>% write_tsv('topPositionCounts.tsv')
+topPosCntsWseed %>% write_tsv('topPositionCounts.tsv')
 topTcReads %>% write_tsv('topTcReads.tsv')
 # matureWide %>% write_tsv('matureMirs.tsv')
 # starWide %>% write_tsv('starMirs.tsv')
