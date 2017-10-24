@@ -7,11 +7,11 @@ preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = past
 
 # Long TC
 # Rep1
-# inFold <- '/Volumes/ameres/Reichholf/sequencing/20161102_Ago2KO_slam-pulse/align/bowtie_ext-bs-all/stats'
-# normTP <- 45498
+inFold <- '/Volumes/ameres/Reichholf/sequencing/20161102_Ago2KO_slam-pulse/align/bowtie_ext-bs-all/stats'
+normTP <- 45498
 # Rep2
-inFold <- '/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merge_aligned/stats'
-normTP <- 47122
+# inFold <- '/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merge_aligned/stats'
+# normTP <- 47122
 # Short TC
 # Rep 1
 # inFold <- '/Volumes/ameres/Reichholf/sequencing/20170922_S2_Ago2KO_short-tc_noVirus/aligned/bowtie-bs-ext/stats'
