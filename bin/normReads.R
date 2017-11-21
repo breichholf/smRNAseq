@@ -1,9 +1,61 @@
 library(Biostrings)
 library(tidyverse)
 library(broom)
+library(stringr)
 
 ### biogenesis kinetics - expected input: `allReadsBGMinus`
 ### linear fits to 0, 5, 15, 30.
+reduce.to.min <- function(r1df, r2df) {
+  r1.min <-
+    r1df %>%
+    select(-(mir_name:`3p`), -matches('kbio'), -timepoint) %>%
+    rename(R1.avg.reads = average.reads,
+           R1.sRNArds = sRNAreads,
+           R1.miRrds = miRNAreads,
+           R1.miRs = read.sum.miR,
+           R1.sRNAs = read.sum.sRNA)
+  
+  r2.min <-
+    r2df %>%
+    select(-(mir_name:`3p`), -matches('kbio'), -timepoint) %>%
+    rename(R2.avg.reads = average.reads,
+           R2.sRNArds = sRNAreads,
+           R2.miRrds = miRNAreads,
+           R2.miRs = read.sum.miR,
+           R2.sRNAs = read.sum.sRNA)
+  
+  joined.min.avgs <-
+    full_join(r1.min %>% filter(R1.sRNAs > 0),
+              r2.min %>% filter(R2.sRNAs > 0)) %>%
+    na.omit() %>%
+    mutate(avg.miRs = (R1.miRs + R2.miRs) / 2,
+           avg.sRNAs = (R1.sRNAs + R2.sRNAs) / 2)
+  
+  return(joined.min.avgs)
+}
+
+linFit.avgs <- function(df, maxTime) {
+  fit.miR <-
+    df %>%
+    filter(LD.type != "totalLenDis", time <= !!maxTime) %>%
+    group_by(arm.name) %>%
+    do(fit = lm(avg.miRs ~ 0 + time, data = .)) %>%
+    tidy(fit) %>%
+    dplyr::select(arm.name, estimate) %>%
+    rename(kbio.miR = estimate)
+  
+  fit.sRNAs <-
+    df %>%
+    filter(LD.type != "totalLenDis", time <= !!maxTime) %>%
+    group_by(arm.name) %>%
+    do(fit = lm(avg.sRNAs ~ 0 + time, data = .)) %>%
+    tidy(fit) %>%
+    dplyr::select(arm.name, estimate) %>%
+    rename(kbio.sRNAs = estimate)
+  
+  return(full_join(fit.miR, fit.sRNAs) %>% ungroup())
+}
+
 linFit <- function(readDf, maxTime) {
   filterDf <-
     readDf %>%
@@ -94,13 +146,19 @@ mergeSeedInfo <- function(tcAllReads, topPos) {
 # Rep2
 # inFold <- '/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/nf_results/stats/'
 # readFile <- '/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merge_aligned/20161205_smallRNAreads.txt'
+# Merged R1 R2
+# inFold <- '/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merged_nfresults/results/stats/'
+# readFile <- '/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merged_nfresults/20161102_1205_merged-early_smallRNAreads.txt'
 # Short TC
 # Rep 1
-inFold <- '/Volumes/ameres/Reichholf/sequencing/20170922_S2_Ago2KO_short-tc_noVirus/aligned/results/stats'
-readFile <- '/Volumes/ameres/Reichholf/sequencing/20170922_S2_Ago2KO_short-tc_noVirus/aligned/bowtie-bs-ext/20170922_smallRNAreads.txt'
+# inFold <- '/Volumes/ameres/Reichholf/sequencing/20170922_S2_Ago2KO_short-tc_noVirus/aligned/results/stats'
+# readFile <- '/Volumes/ameres/Reichholf/sequencing/20170922_S2_Ago2KO_short-tc_noVirus/aligned/bowtie-bs-ext/20170922_smallRNAreads.txt'
 # Rep2
 # inFold <- '/Volumes/ameres/Reichholf/sequencing/20171005_Ago2KO_short-tc_noVirus_R2/aligned/results/stats'
 # readFile <- '/Volumes/ameres/Reichholf/sequencing/20171005_Ago2KO_short-tc_noVirus_R2/aligned/bowtie-bs-ext/20171005_smallRNAreads.txt'
+# Merged Short R1 R2
+inFold <- '/Volumes/ameres/Reichholf/sequencing/20171005_Ago2KO_short-tc_noVirus_R2/merged_to-60min/results/stats/'
+readFile <- '/Volumes/ameres/Reichholf/sequencing/20171005_Ago2KO_short-tc_noVirus_R2/merged_to-60min/20171104_smallRNAreads.txt'
 # json <- '../json/samples.json'
 # LNA transfection - 57521 = scrambled 24h labelling
 # inFold <- '/Volumes/ameres/Reichholf/sequencing/vh/20171020_S2_LNA-transfection/results/stats/'
@@ -202,6 +260,14 @@ longTC.R2.bio.duplex <-
          lTC.R2.kbio.smRNA = kbio.smRNA.15) %>%
   select(arm.name, pos, seed, UCount, mir.type, matches('lTC'))
 
+longTC.joined.allreads <- allReadsBGMinus
+longTC.joined.bio.duplex <-
+  mergeSeedInfo(longTC.joined.allreads, topPosWseed) %>%
+  rename(lTC.j.avg.reads = average.reads,
+         lTC.j.kbio.miR = kbio.miRNA.15,
+         lTC.j.kbio.smRNA = kbio.smRNA.15) %>%
+  select(arm.name, pos, seed, UCount, mir.type, matches('lTC'))
+
 shortTC.R1.allReads <- allReadsBGMinus
 shortTC.R1.bio.duplex <-
   mergeSeedInfo(shortTC.R1.allReads, topPosWseed) %>%
@@ -217,6 +283,39 @@ shortTC.R2.bio.duplex <-
          sTC.R2.kbio.miR = kbio.miRNA.15,
          sTC.R2.kbio.smRNA = kbio.smRNA.15) %>%
   select(arm.name, pos, seed, UCount, mir.type, matches('sTC'))
+
+shortTC.joined.allreads <- allReadsBGMinus
+shortTC.joined.bio.duplex <-
+  mergeSeedInfo(shortTC.joined.allreads, topPosWseed) %>%
+  rename(sTC.j.avg.reads = average.reads,
+         sTC.j.kbio.miR = kbio.miRNA.15,
+         sTC.j.kbio.smRNA = kbio.smRNA.15) %>%
+  select(arm.name, pos, seed, UCount, mir.type, matches('sTC'))
+
+total.kbio <-
+  longTC.R1.bio.duplex %>%
+  full_join(longTC.R2.bio.duplex) %>%
+  full_join(longTC.joined.bio.duplex) %>%
+  full_join(shortTC.R1.bio.duplex) %>%
+  full_join(shortTC.R2.bio.duplex) %>%
+  full_join(shortTC.joined.bio.duplex) %>%
+  filter(!is.na(lTC.j.avg.reads), !is.na(sTC.j.avg.reads)) %>%
+  mutate(locus = str_sub(arm.name, 1, -4),
+         locus = ifelse(locus == "mir-2a-1" | locus == "mir-2a-2" | locus == "mir-2b-1", 'mir-2a', locus),
+         locus = str_replace(locus, 'mir', 'miR'))
+
+longTC.joined <- reduce.to.min(longTC.R1.allReads, longTC.R2.allReads)
+shortTC.joined <- reduce.to.min(shortTC.R1.allReads, shortTC.R2.allReads)
+
+longTC.fit15 <- linFit.avgs(longTC.joined, 15) %>% rename(kbio.miR.15 = kbio.miR, kbio.sRNAs.15 = kbio.sRNAs)
+longTC.fit30 <- linFit.avgs(longTC.joined, 30) %>% rename(kbio.miR.30 = kbio.miR, kbio.sRNAs.30 = kbio.sRNAs)
+shortTC.fit15 <- linFit.avgs(shortTC.joined, 15) %>% rename(kbio.miR.15 = kbio.miR, kbio.sRNAs.15 = kbio.sRNAs)
+shortTC.fit30 <- linFit.avgs(shortTC.joined, 30) %>% rename(kbio.miR.30 = kbio.miR, kbio.sRNAs.30 = kbio.sRNAs)
+
+longTC.fits <- full_join(longTC.fit15, longTC.fit30)
+shortTC.fits <- full_join(shortTC.fit15, shortTC.fit30)
+
+
 
 ### Get maximum reads AFTER background subtraction
 #   normalise to `normTime` (3h)
