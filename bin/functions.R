@@ -289,7 +289,7 @@ pileupParallelMuts <- function(groupedData, snow) {
   tp <- groupedData$timepoint
   pos <- groupedData$pos
 
-  doOut <- bpmapply(pileupDo, miR = fbid, timepoint = tp, pos = pos,
+  doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, pos = pos,
                     MoreArgs = list(bamFile = bF, minLen = 18),
                     SIMPLIFY = FALSE, BPPARAM = snow)
 
