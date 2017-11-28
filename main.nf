@@ -479,7 +479,7 @@ process mutationStats {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  getMutationsFromBAM.R $baseDir ${params.rlocation} $readCountConfig $alignStats $hairpinFasta
+  getMutationsFromBAM.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $alignStats $hairpinFasta
   """
 }
 */

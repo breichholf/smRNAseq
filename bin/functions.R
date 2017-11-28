@@ -12,6 +12,11 @@ setupRlibs <- function(R_lib){
     biocLite("Rsamtools", suppressUpdates=TRUE)
   }
 
+  if (!require("BiocParallel")){
+    source("http://bioconductor.org/biocLite.R")
+    biocLite("BiocParallel", suppressUpdates=TRUE)
+  }
+
   if (!require("stringr")){
     install.packages("stringr", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }
@@ -274,3 +279,54 @@ onlyTCReads <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen = 
                                               flag = scanBamFlag(isMinusStrand = F)),
                          filter = onlyTCandNoNs)
 }
+
+pileupParallelMuts <- function(groupedData, snow) {
+  require(BiocParallel)
+  require(dplyr)
+
+  fbid <- groupedData$flybase_id
+  bF <- unique(groupedData$bamFile)
+  tp <- groupedData$timepoint
+  pos <- groupedData$pos
+
+  doOut <- bpmapply(pileupDo, miR = fbid, timepoint = tp, pos = pos,
+                    MoreArgs = list(bamFile = bF, minLen = 18),
+                    SIMPLIFY = FALSE, BPPARAM = snow)
+
+  return(dplyr::bind_rows(doOut))
+}
+
+doParallelPileup <- function(miR, timepoint, pos, bamFile, minLen) {
+  # This function will be called from dplyr do() in parallel using BiocParallel `bpmapply`
+  # The function itself returns a cleaned data.frame of the pileup, which mapply wraps in a list
+  # with one item for every bamFile.
+  require(Rsamtools)
+  require(dplyr)
+
+  start.pos <- pos
+  end.pos <- start.pos + 30
+
+  pparam <- PileupParam(query_bins = seq(0,30), max_depth=10000000, min_mapq=0, min_base_quality=0)
+  sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
+                             which=GRanges(miR, IRanges(start.pos, end.pos)))
+
+  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
+  filterBam <- filterBam(bamFile, tempfile(),
+                         param = ScanBamParam(what = "seq",
+                                              flag = scanBamFlag(isMinusStrand = F)),
+                         filter = filterNs)
+
+  pileupResult <- pileup(filterBam, scanBamParam = sparam, pileupParam = pparam)
+
+  filteredRes <-
+    pileupResult %>%
+    dplyr::select(-which_label, -strand) %>%
+    mutate(relPos = as.numeric(query_bin),
+           flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
+           timepoint = timepoint) %>%
+    dplyr::select(-seqnames, -query_bin) %>%
+    dplyr::filter(relPos == pos - min(pos) + 1, relPos <= minLen)
+
+  return(filteredRes)
+}
+
