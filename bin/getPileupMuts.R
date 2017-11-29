@@ -37,7 +37,7 @@ preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = past
 
 mirBodyLength <- 18
 
-opMirCounts <-
+topMirCounts <-
   topPositions %>%
   left_join(cfg.samples, by = c('timepoint' = 'id')) %>%
   mutate(bamFile = file.path(align)) %>%
@@ -55,3 +55,4 @@ topMirs <-
   do(muts = pileupParallelMuts(groupedData = ., snow = snow)) %>%
   unnest(muts)
 
+system.time(topMirs <- topMirCutoff %>% group_by(flybase_id) %>% do(muts = pileupParallelMuts(groupedData = ., snow = snow)) %>% unnest(muts))

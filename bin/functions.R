@@ -288,15 +288,16 @@ pileupParallelMuts <- function(groupedData, snow) {
   bF <- unique(groupedData$bamFile)
   tp <- groupedData$timepoint
   pos <- groupedData$pos
+  mir.type <- groupedData$mir.type
 
   doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, pos = pos,
-                    MoreArgs = list(bamFile = bF, minLen = 18),
+                    mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = 18),
                     SIMPLIFY = FALSE, BPPARAM = snow)
 
   return(dplyr::bind_rows(doOut))
 }
 
-doParallelPileup <- function(miR, timepoint, pos, bamFile, minLen) {
+doParallelPileup <- function(miR, timepoint, pos, mir.type, bamFile, minLen) {
   # This function will be called from dplyr do() in parallel using BiocParallel `bpmapply`
   # The function itself returns a cleaned data.frame of the pileup, which mapply wraps in a list
   # with one item for every bamFile.
@@ -308,7 +309,7 @@ doParallelPileup <- function(miR, timepoint, pos, bamFile, minLen) {
 
   pparam <- PileupParam(query_bins = seq(0,30), max_depth=10000000, min_mapq=0, min_base_quality=0)
   sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
-                             which=GRanges(miR, IRanges(start.pos, end.pos)))
+                         which=GRanges(miR, IRanges(start.pos, end.pos)))
 
   filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
   filterBam <- filterBam(bamFile, tempfile(),
@@ -323,7 +324,9 @@ doParallelPileup <- function(miR, timepoint, pos, bamFile, minLen) {
     dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
            flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
-           timepoint = timepoint) %>%
+           timepoint = timepoint,
+           mir.type = mir.type,
+           start.pos = pos) %>%
     dplyr::select(-seqnames, -query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= minLen)
 
