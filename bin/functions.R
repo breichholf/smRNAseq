@@ -38,7 +38,7 @@ setupRlibs <- function(R_lib){
   }
 
   if (!require("tidyr")) {
-    install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
+    install.packages("tidyr", dependencies=TRUE, repos='http://cloud.r-project.org/')
   }
 
   if (!require("cowplot")) {
@@ -56,76 +56,29 @@ setupRlibs <- function(R_lib){
 
 }
 
-prepareFlybaseGFF <- function(gff, conversion, output) {
-  require(tidyverse)
-  require(stringr)
+getcfg <- function(json) {
+  suppressMessages(require(jsonlite))
+  suppressMessages(require(dplyr))
+  suppressMessages(require(readr))
 
-  # Read in file
-  fbGFF <- read_tsv(opt$gff,
-                    col_names = c('chr', 'source', 'type', 'start', 'end', 'score', 'strand', 'dot', 'tags'),
-                    col_types = list('c', 'c', 'c', 'n', 'n', 'c', 'c', 'c', 'c'))
-  fbRows <- fbGFF %>% separate_rows(tags, sep = ";")
-  fbIDs <-
-    fbRows %>% filter(grepl("ID=FBtr", tags)) %>%
-    mutate(id = str_sub(tags, 4, length(tags))) %>%
-    select(type, id) %>% rename(parent.type = type)
+  cfg.info <- jsonlite::read_json(json)
+  file.home <- cfg.info$base
+  mir.anno <- read_tsv(cfg.info$mir.anno)
 
-  # miRNAs have "Parent=FBgn", so they're filtered out here
-  fbGenicParents <-
-    fbRows %>% filter(grepl("Parent=FBtr", tags)) %>%
-    mutate(id = str_sub(tags, 8, length(tags))) %>%
-    rename(source.type = type) %>% left_join(fbIDs, by = "id")
+  cfg.samples <- dplyr::bind_rows(cfg.info$samples)
+  cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
 
-  fbGenic <-
-    fbGenicParents %>% filter(!grepl("mito", chr) & grepl("exon|intron|UTR", source.type)) %>%
-    mutate(print.start = ifelse(parent.type == "tRNA", ifelse(start < 20, 0, start - 20),
-                                start),
-           print.end = ifelse(parent.type == "tRNA",
-                              end + 20,
-                              end),
-           print.name = ifelse(grepl("mRNA|pseudogene|ncRNA", parent.type),
-                               paste(parent.type, source.type, sep = "_"),
-                               parent.type),
-           score = 0) %>%
-    select(chr, print.start, print.end, print.name, score, strand)
-
-  fbMirs <-
-    fbGFF %>% filter(!grepl("mito", chr) & grepl("miRNA", type)) %>%
-    mutate(score = 0) %>%
-    rename(print.start = start, print.end = end, print.name = type) %>%
-    select(chr, print.start, print.end, print.name, score, strand)
-
-  # Concatenate genic and miRs
-  concatBed <- rbind(fbGenic, fbMirs)
-
-  # Convert Chr Names
-  # Read in file first - first lines contain "#" which are comments.
-  assemblyReport <- read_tsv(opt$nameconversion, comment = "#",
-                             col_names = c('fb.name', 'sequence.role', 'assigned.molecule',
-                                           'molecule.loaction.type', 'genbank.accn', 'relationship',
-                                           'RefSeq.accn', 'Assembly.Unit', 'sequence.length', 'ucsc.name'),
-                             col_types = list('c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'))
-
-  # Select appropriate columns and remove leading "chr" from UCSC Names
-  chrConversion <-
-    assemblyReport %>%
-    mutate(new.ucsc = str_replace(ucsc.name, "^chr", "")) %>%
-    select(fb.name, new.ucsc) %>%
-    mutate(fb.name = ifelse(new.ucsc == "M", "mitochondrion_genome", fb.name))
-
-  # Convert Flybase Names to UCSC-compatible names
-  outputBed <-
-    concatBed %>% left_join(chrConversion, by = c('chr' = 'fb.name')) %>%
-    select(new.ucsc, print.start, print.end, print.name, score, strand)
-
-  # Write output file, will overwrite old files
-  outputBed %>% write_tsv(opt$output, col_names = FALSE)
+  return(cfg.samples)
 }
 
-get.top.startpos <- function(id, align, sRNAreads, mirAnno = NULL, topn = 5, ...) {
-  require(dplyr)
-  require(stringr)
-  require(Rsamtools)
+# 1) Reads bam
+# 2) Filters out reads that don't map with in +/- 5 of annotated 5p and 3p arms
+# 3) Counts all reads (and all TC reads with BQ>27) for given starting position
+# 4) Assesses read lengths
+# 5) Normalises reads to sRNAreads provided in cfg file
+get.top.startpos <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, ...) {
+  suppressMessages(require(tidyverse))
+  suppressMessages(require(Rsamtools))
   mapInfo <- c("rname", "strand", "pos")
   mapParams <- ScanBamParam(what = c(mapInfo, "seq"), tag = c("TC", "TN"),
                             flag = scanBamFlag(isMinusStrand = FALSE, isUnmappedQuery = FALSE))
@@ -165,10 +118,10 @@ get.top.startpos <- function(id, align, sRNAreads, mirAnno = NULL, topn = 5, ...
                              paste0(str_sub(mir_name, 5, -1), "-5p"),
                              paste0(str_sub(mir_name, 5, -1), "-3p")))
 
-  totalRName <- paste("totalReads", id, sep = ".")
-  tcRName <- paste("tcReads", id, sep = ".")
-  totalLDname <- paste("totalLenDis", id, sep = ".")
-  tcLDname <- paste("tcLenDis", id, sep = ".")
+  totalRName <- paste("totalReads", id, time, sep = ".")
+  tcRName <- paste("tcReads", id, time, sep = ".")
+  totalLDname <- paste("totalLenDis", id, time, sep = ".")
+  tcLDname <- paste("tcLenDis", id, time, sep = ".")
 
   r.sum.max.pos <-
     r.sum.arms %>%
@@ -185,18 +138,54 @@ get.top.startpos <- function(id, align, sRNAreads, mirAnno = NULL, topn = 5, ...
 }
 
 convertToWide <- function(gatheredAllCounts, mirType) {
-  require(dplyr)
-  require(forcats)
+  suppressMessages(require(dplyr))
+  suppressMessages(require(forcats))
+
   mirType <- enquo(mirType)
 
   output <-
     gatheredAllCounts %>%
     dplyr::filter(mir.type == !!mirType) %>%
+    unite(lib, read.type, timepoint, time, sep = ".") %>%
     mutate(arm.name = fct_reorder(arm.name, desc(average.reads))) %>%
-    dplyr::select(arm.name, pos, timepoint, reads) %>%
-    spread(timepoint, reads)
+    dplyr::select(arm.name, pos, seed, UCount, average.reads, mir.type, lib, reads) %>%
+    spread(lib, reads)
 
   return(output)
+}
+
+subtractTcBg <- function(lenDis, bgTime) {
+  suppressMessages(require(dplyr))
+
+  bgTime <- enquo(bgTime)
+
+  bgLD <-
+    lenDis %>% filter(LD.type == "tcLenDis", time == !!bgTime) %>%
+    select(pos, seqLen, flybase_id, LD.type, reads) %>%
+    replace_na(list(reads = 0))
+
+  lenDisBgMinus <-
+    lenDis %>% left_join(bgLD %>% rename(bg.reads = reads)) %>%
+    replace_na(list(bg.reads = 0)) %>%
+    mutate(bg.subtract = ifelse(reads - bg.reads > 0, reads - bg.reads, 0)) %>%
+    group_by(pos, flybase_id, LD.type, timepoint) %>%
+      mutate(read.sum = sum(bg.subtract, na.rm = TRUE)) %>%
+    ungroup()
+
+  return(lenDisBgMinus)
+}
+
+convertLDtoWide <- function(lenDis, mir.type) {
+  mir.type <- enquo(mir.type)Sys.Date
+
+  filteredLD <-
+    lenDis %>%
+    filter(mir.type = !!mir.type) %>%
+    select(-reads, -bg.reads) %>%
+    unite(lendis, LD.type, timepoint, time, sep = ".") %>%
+    spread(lendis, bg.subtract)
+
+  return(filteredLD)
 }
 
 mutsFromPileup <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen = 18, ...) {
@@ -281,8 +270,8 @@ onlyTCReads <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen = 
 }
 
 pileupParallelMuts <- function(groupedData, snow) {
-  require(BiocParallel)
-  require(dplyr)
+  suppressMessages(require(BiocParallel))
+  suppressMessages(require(dplyr))
 
   fbid <- groupedData$flybase_id
   bF <- unique(groupedData$bamFile)
@@ -301,8 +290,8 @@ doParallelPileup <- function(miR, timepoint, pos, mir.type, bamFile, minLen) {
   # This function will be called from dplyr do() in parallel using BiocParallel `bpmapply`
   # The function itself returns a cleaned data.frame of the pileup, which mapply wraps in a list
   # with one item for every bamFile.
-  require(Rsamtools)
-  require(dplyr)
+  suppressMessages(require(Rsamtools))
+  suppressMessages(require(dplyr))
 
   start.pos <- pos
   end.pos <- start.pos + 30
@@ -326,10 +315,76 @@ doParallelPileup <- function(miR, timepoint, pos, mir.type, bamFile, minLen) {
            flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint,
            mir.type = mir.type,
-           start.pos = pos) %>%
+           start.pos = start.pos) %>%
     dplyr::select(-seqnames, -query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= minLen)
 
   return(filteredRes)
 }
 
+# Not needed for now
+# prepareFlybaseGFF <- function(gff, conversion, output) {
+#   require(tidyverse)
+#   require(stringr)
+
+#   # Read in file
+#   fbGFF <- read_tsv(opt$gff,
+#                     col_names = c('chr', 'source', 'type', 'start', 'end', 'score', 'strand', 'dot', 'tags'),
+#                     col_types = list('c', 'c', 'c', 'n', 'n', 'c', 'c', 'c', 'c'))
+#   fbRows <- fbGFF %>% separate_rows(tags, sep = ";")
+#   fbIDs <-
+#     fbRows %>% filter(grepl("ID=FBtr", tags)) %>%
+#     mutate(id = str_sub(tags, 4, length(tags))) %>%
+#     select(type, id) %>% rename(parent.type = type)
+
+#   # miRNAs have "Parent=FBgn", so they're filtered out here
+#   fbGenicParents <-
+#     fbRows %>% filter(grepl("Parent=FBtr", tags)) %>%
+#     mutate(id = str_sub(tags, 8, length(tags))) %>%
+#     rename(source.type = type) %>% left_join(fbIDs, by = "id")
+
+#   fbGenic <-
+#     fbGenicParents %>% filter(!grepl("mito", chr) & grepl("exon|intron|UTR", source.type)) %>%
+#     mutate(print.start = ifelse(parent.type == "tRNA", ifelse(start < 20, 0, start - 20),
+#                                 start),
+#            print.end = ifelse(parent.type == "tRNA",
+#                               end + 20,
+#                               end),
+#            print.name = ifelse(grepl("mRNA|pseudogene|ncRNA", parent.type),
+#                                paste(parent.type, source.type, sep = "_"),
+#                                parent.type),
+#            score = 0) %>%
+#     select(chr, print.start, print.end, print.name, score, strand)
+
+#   fbMirs <-
+#     fbGFF %>% filter(!grepl("mito", chr) & grepl("miRNA", type)) %>%
+#     mutate(score = 0) %>%
+#     rename(print.start = start, print.end = end, print.name = type) %>%
+#     select(chr, print.start, print.end, print.name, score, strand)
+
+#   # Concatenate genic and miRs
+#   concatBed <- rbind(fbGenic, fbMirs)
+
+#   # Convert Chr Names
+#   # Read in file first - first lines contain "#" which are comments.
+#   assemblyReport <- read_tsv(opt$nameconversion, comment = "#",
+#                              col_names = c('fb.name', 'sequence.role', 'assigned.molecule',
+#                                            'molecule.loaction.type', 'genbank.accn', 'relationship',
+#                                            'RefSeq.accn', 'Assembly.Unit', 'sequence.length', 'ucsc.name'),
+#                              col_types = list('c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'))
+
+#   # Select appropriate columns and remove leading "chr" from UCSC Names
+#   chrConversion <-
+#     assemblyReport %>%
+#     mutate(new.ucsc = str_replace(ucsc.name, "^chr", "")) %>%
+#     select(fb.name, new.ucsc) %>%
+#     mutate(fb.name = ifelse(new.ucsc == "M", "mitochondrion_genome", fb.name))
+
+#   # Convert Flybase Names to UCSC-compatible names
+#   outputBed <-
+#     concatBed %>% left_join(chrConversion, by = c('chr' = 'fb.name')) %>%
+#     select(new.ucsc, print.start, print.end, print.name, score, strand)
+
+#   # Write output file, will overwrite old files
+#   outputBed %>% write_tsv(opt$output, col_names = FALSE)
+# }

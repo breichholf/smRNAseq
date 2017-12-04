@@ -11,42 +11,37 @@ source(file.path(scriptDir, "bin/functions.R"))
 
 setupRlibs(R_libs)
 
-library(dplyr)
+library(tidyverse)
 library(purrr)
-library(jsonlite)
-library(tidyr)
-library(readr)
-library(stringr)
 
 sessionInfo()
 
-cfg.info <- jsonlite::read_json(jsonFile)
-file.home <- cfg.info$base
-mir.anno <- read_tsv(cfg.info$mir.anno)
-
-cfg.samples <- dplyr::bind_rows(cfg.info$samples)
-cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
+cfg.samples <- getcfg(jsonFile)
 
 preMirFasta <- readDNAStringSet(preMirFastaFile)
 preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = paste(preMirFasta)))
 
 mirBodyLength <- 18
 
+# `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
+# also includes lengths
 allcounts <- cfg.samples %>% pmap(get.top.startpos, mirAnno = mir.anno) %>% purrr::reduce(full_join)
 
+# Converting to tidy format, and omitting length distribution.
 gatheredCounts <-
   allcounts %>%
   select(-matches("LenDis"), -seqLen) %>%
   gather(type, reads, matches("Reads\\.")) %>%
-  separate(type, c("read.type", "timepoint"), convert = TRUE) %>%
+  separate(type, c("read.type", "timepoint", "time"), convert = TRUE) %>%
   replace_na(list(reads = 0)) %>%
   group_by(flybase_id, pos, read.type, timepoint) %>%
-    dplyr::filter(reads == max(reads)) %>%
+    filter(reads == max(reads)) %>%
   ungroup() %>% distinct()
 
+# Get best mapping 5p starting position and add 'mature' and 'star' nomenclature
 topPositionCounts <-
   gatheredCounts %>%
-  dplyr::filter(read.type == "totalReads") %>%
+  filter(read.type == "totalReads") %>%
   group_by(pos, flybase_id) %>%
     mutate(average.reads = mean(reads)) %>%
   group_by(arm.name) %>%
@@ -55,6 +50,7 @@ topPositionCounts <-
     mutate(mir.type = ifelse(average.reads == max(average.reads), "mature", "star")) %>%
   ungroup()
 
+# Adding in metadata such as U count and seed (pos 1-8)
 topPosCntsWseed <-
   topPositionCounts %>%
   left_join(preMirTbl) %>%
@@ -63,38 +59,50 @@ topPosCntsWseed <-
          UCount = str_count(mirBody, "T")) %>%
   select(-mirBody, -full.seq)
 
-topTcReads <-
-  gatheredCounts %>%
-  dplyr::filter(read.type != "totalReads") %>%
-  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, mir.type)) %>%
-  dplyr::filter(!is.na(mir.type))
+# Isolate TC reads
+# topTcReads <-
+#   gatheredCounts %>%
+#   filter(read.type != "totalReads") %>%
+#   left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, time, mir.type, average.reads)) %>%
+#   filter(!is.na(mir.type))
 
+# Convert `allcounts` to tidy format for length distributions (all reads and tc reads)
 gatheredLenDis <-
   allcounts %>%
   select(-matches("Reads")) %>%
   gather(type, reads, matches("LenDis")) %>%
-  separate(type, c("LD.type", "timepoint"), convert = TRUE) %>%
+  separate(type, c("LD.type", "timepoint", "time"), convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
-  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, mir.type)) %>%
-  dplyr::filter(!is.na(mir.type))
+  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, time, mir.type)) %>%
+  filter(!is.na(mir.type))
 
-totalLenDis <-
+# Isolate length distribution for all reads only
+steadyStateLenDis <-
   gatheredLenDis %>%
-  dplyr::filter(LD.type == "totalLenDis")
+  filter(LD.type == "totalLenDis")
 
-tcLenDis <-
-  gatheredLenDis %>%
-  dplyr::filter(LD.type == "tcLenDis")
+# Isolate length distribution for TC reads only
+# tcLenDis <-
+#   gatheredLenDis %>%
+#   filter(LD.type == "tcLenDis")
 
-# matureWide <- convertToWide(topPositionCounts, "mature")
+####
+##  Write output files
+####
 
-# starWide <- convertToWide(topPositionCounts, "star")
+# Separately extract mature and star steady state read counts (ppm) with metadata
+matureWide <- convertToWide(topPosCntsWseed, "mature")
+starWide <- convertToWide(topPosCntsWseed, "star")
+# matureTcWide <- convertToWide(topTcReads, "mature")
+# starTcWide <- convertToWide(topTcReads, "star")
 
 allcounts %>% write_tsv('allCounts.tsv')
-gatheredCounts %>% write_tsv('gatheredCounts.tsv')
-totalLenDis %>% write_tsv('totalLenDis.tsv')
-tcLenDis %>% write_tsv('tcLenDis.tsv')
 topPosCntsWseed %>% write_tsv('topPositionCounts.tsv')
-topTcReads %>% write_tsv('topTcReads.tsv')
-# matureWide %>% write_tsv('matureMirs.tsv')
-# starWide %>% write_tsv('starMirs.tsv')
+gatheredLenDis %>% write_tsv('rawLenDis.tsv')
+steadyStateLenDis %>% write_tsv('steadyStateLenDis.tsv')
+matureWide %>% write_tsv('miR.steadyState.PPM.tsv')
+starWide %>% write_tsv('miRSTAR.steadyState.PPM.tsv')
+# tcLenDis %>% write_tsv('tcLenDis.tsv')
+# topTcReads %>% write_tsv('topTcReads.tsv')
+# matureTcWide %>% write_tsv('matureTcPPM.tsv')
+# starTcWide %>% write_tsv('starTcPPM.tsv')

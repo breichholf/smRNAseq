@@ -28,7 +28,7 @@
  *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.4.4"
+version = "0.5"
 
 /*
  * Helper functions
@@ -423,11 +423,14 @@ process writeJson {
     idx = int(nameElements[0])
     # sRNAreads = 1000000
     sRNAreads = readCounts[readCounts.idx == idx]['sRNAreads'].values[0]
+    time = readCounts[readCounts.idx == idx]['time'].values[0]
+    miRNAreads = readCounts[readCounts.idx == idx]['miRNAreads'].values[0]
     samples.append({"id": idx,
-                    "time": str(idx) + "h",
+                    "time": time,
                     "align": bam,
                     "posFile": str(idx) + "_pos.tsv",
-                    "sRNAreads": sRNAreads})
+                    "sRNAreads": sRNAreads,
+                    "miRNAreads": miRNAreads})
 
   jsDict["samples"] = samples
 
@@ -435,6 +438,14 @@ process writeJson {
     json.dump(jsDict, fp)
   """
 }
+
+/*
+ *  STEP 5b: Postprocessing -- Getting alignment statistics for miR hairpin mappers
+ *                             1) Count all reads and T>C reads with BQ>27
+ *                             2) Length-specific background subtraction for TC reads
+ *                             3) Separate miR and miR-STAR bg-subtracted T>C reads
+ *                             4)
+ */
 
 process alignmentStats {
 
@@ -445,31 +456,30 @@ process alignmentStats {
   file hairpinFasta
 
   output:
-  file 'topPositionCounts.tsv' into alignStats
-  file '*Counts.tsv' into countTSV
-  file '*LenDis.tsv' into lendisTSV
-  file '*TcReads.tsv' into tcReads
-  file 'bgSub*.tsv' into bgSubtracted
+  file 'allCounts.tsv' into allCounts
+  file 'topPositionCounts.tsv' into topPositions
+  file 'rawLenDis.tsv' into tcReads
+  file 'steadyStateLenDis.tsv' into steadyStateLD
+  file '*PPM.tsv' into ppmTSV
+  file 'bgMinus*.tsv' into bgSubtractedTSV
 
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
   summarisePos.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
-  spreadReads.R allCounts.tsv topPositionCounts.tsv ./
+  spreadReads.R rawLenDis.tsv 0 3 ./
   """
 }
 
 /*
-  Purrr runs 'in parallel', but only on one core.
-  Incorporate `BiocParallel`, to run across as many cores as we're requesting,
-  THEN readd.
-*//*
+  Pileups are read and processed in parallel using BiocParallel
+*/
 process mutationStats {
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:
   file readCountConfig
-  file alignStats
+  file topPositions
   file hairpinFasta
 
   output:
@@ -479,7 +489,7 @@ process mutationStats {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  getMutationsFromBAM.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $alignStats $hairpinFasta
+  getPileupMuts.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
   """
 }
-*/
+
