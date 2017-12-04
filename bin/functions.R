@@ -176,7 +176,7 @@ subtractTcBg <- function(lenDis, bgTime) {
 }
 
 convertLDtoWide <- function(lenDis, mir.type) {
-  mir.type <- enquo(mir.type)Sys.Date
+  mir.type <- enquo(mir.type)
 
   filteredLD <-
     lenDis %>%
