@@ -16,7 +16,7 @@ library(purrr)
 
 sessionInfo()
 
-cfg.samples <- getcfg(jsonFile)
+cfg <- getcfg(jsonFile)
 
 preMirFasta <- readDNAStringSet(preMirFastaFile)
 preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = paste(preMirFasta)))
@@ -25,7 +25,7 @@ mirBodyLength <- 18
 
 # `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
 # also includes lengths
-allcounts <- cfg.samples %>% pmap(get.top.startpos, mirAnno = mir.anno) %>% purrr::reduce(full_join)
+allcounts <- cfg$samples %>% pmap(get.top.startpos, mirAnno = cfg$anno) %>% purrr::reduce(full_join)
 
 # Converting to tidy format, and omitting length distribution.
 gatheredCounts <-

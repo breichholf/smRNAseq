@@ -19,7 +19,7 @@ library(BiocParallel)
 
 sessionInfo()
 
-cfg.samples <- getcfg(jsonFile)
+cfg <- getcfg(jsonFile)
 
 topPositions <- read_tsv(topPosFile)
 
@@ -38,7 +38,7 @@ tidyRefNucs <-
 
 topMirCounts <-
   topPositions %>%
-  left_join(cfg.samples, by = c('timepoint' = 'id')) %>%
+  left_join(cfg$samples, by = c('timepoint' = 'id')) %>%
   mutate(bamFile = file.path(align)) %>%
   left_join(preMirTbl)
 

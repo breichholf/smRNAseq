@@ -68,7 +68,7 @@ getcfg <- function(json) {
   cfg.samples <- dplyr::bind_rows(cfg.info$samples)
   cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
 
-  return(cfg.samples)
+  return(list("samples" = cfg.samples, "anno" = mir.anno))
 }
 
 # 1) Reads bam
