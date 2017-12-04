@@ -276,17 +276,18 @@ pileupParallelMuts <- function(groupedData, snow) {
   fbid <- groupedData$flybase_id
   bF <- unique(groupedData$bamFile)
   tp <- groupedData$timepoint
+  t <- groupedData$time
   pos <- groupedData$pos
   mir.type <- groupedData$mir.type
 
-  doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, pos = pos,
+  doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, time = t, pos = pos,
                     mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = 18),
                     SIMPLIFY = FALSE, BPPARAM = snow)
 
   return(dplyr::bind_rows(doOut))
 }
 
-doParallelPileup <- function(miR, timepoint, pos, mir.type, bamFile, minLen) {
+doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLen) {
   # This function will be called from dplyr do() in parallel using BiocParallel `bpmapply`
   # The function itself returns a cleaned data.frame of the pileup, which mapply wraps in a list
   # with one item for every bamFile.
