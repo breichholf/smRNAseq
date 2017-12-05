@@ -467,7 +467,7 @@ process alignmentStats {
   """
   export OMP_NUM_THREADS=${task.cpus}
   summarisePos.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
-  spreadReads.R rawLenDis.tsv 0 3 ./
+  spreadReads.R rawLenDis.tsv 0 180 ./
   """
 }
 
