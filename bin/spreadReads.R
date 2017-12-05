@@ -9,9 +9,9 @@ outDir <- as.character(args[4])
 
 library(tidyverse)
 
-rawLenDis <- read_tsv(rawTcLenDisFile)
+rawTcLenDis <- read_tsv(rawTcLenDisFile)
 
-tcLenDis <- rawLenDis %>% filter(LD.type == "tcLenDis")
+# tcLenDis <- rawTcLenDis %>% filter(LD.type == "tcLenDis")
 
 bgMinusLD <- subtractTcBG(rawTcLenDis, bgTime = normLDtime)
 
