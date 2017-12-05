@@ -2,7 +2,7 @@
 
 # Command line arguments
 args = commandArgs(trailingOnly=TRUE)
-rawLenDisFile <- as.character(args[1])
+rawTcLenDisFile <- as.character(args[1])
 normLDtime <- as.numeric(args[2])
 maxTime <- as.numeric(args[3])
 outDir <- as.character(args[4])
