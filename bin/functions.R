@@ -154,7 +154,7 @@ convertToWide <- function(gatheredAllCounts, mirType) {
   return(output)
 }
 
-subtractTcBg <- function(lenDis, bgTime) {
+subtractTcBG <- function(lenDis, bgTime) {
   suppressMessages(require(dplyr))
 
   bgTime <- enquo(bgTime)
