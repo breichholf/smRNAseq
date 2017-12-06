@@ -2,18 +2,22 @@
 
 # Command line arguments
 args = commandArgs(trailingOnly=TRUE)
-rawTcLenDisFile <- as.character(args[1])
-normLDtime <- as.numeric(args[2])
-maxTime <- as.numeric(args[3])
-outDir <- as.character(args[4])
+scriptDir <- as.character(args[1])
+rawTcLenDisFile <- as.character(args[2])
+topPosFile <- as.charachter(args[3])
+normLDtime <- as.numeric(args[4])
+maxTime <- as.numeric(args[5])
+outDir <- as.character(args[6])
+
+source(file.path(scriptDir, "bin/functions.R"))
 
 library(tidyverse)
 
-rawTcLenDis <- read_tsv(rawTcLenDisFile)
+rawLenDis <- read_tsv(rawTcLenDisFile)
 
-# tcLenDis <- rawTcLenDis %>% filter(LD.type == "tcLenDis")
+tcLenDis <- rawLenDis %>% filter(LD.type == "tcLenDis")
 
-bgMinusLD <- subtractTcBG(rawTcLenDis, bgTime = normLDtime)
+bgMinusLD <- subtractTcBG(tcLenDis, bgTime = normLDtime)
 
 bgMinusReadSum <-
   bgMinusLD %>%
@@ -23,7 +27,7 @@ bgMinusReadSum <-
 maxReads <-
   bgMinusReadSum %>%
   filter(time == maxTime, mir.type == "mature") %>%
-  select(pos, flybase_id, LD.type, read.sum) %>%
+  select(flybase_id, LD.type, read.sum) %>%
   rename(max.reads = read.sum)
 
 bgMinusReadSum %>%
@@ -34,6 +38,7 @@ bgMinusReadSum %>%
 bgMinusReadSum %>%
   left_join(maxReads) %>%
   mutate(read.norm = read.sum / max.reads) %>% select(-read.sum, max.reads) %>%
+  filter(time != normLDtime) %>%
   unite(lendis, LD.type, timepoint, time, sep = ".") %>%
   spread(lendis, read.norm) %>%
   write_tsv(file.path(outDir, 'bgMinusNormReads.tsv'))
