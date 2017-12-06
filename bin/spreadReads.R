@@ -4,7 +4,7 @@
 args = commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
 rawTcLenDisFile <- as.character(args[2])
-topPosFile <- as.charachter(args[3])
+topPosFile <- as.character(args[3])
 normLDtime <- as.numeric(args[4])
 maxTime <- as.numeric(args[5])
 outDir <- as.character(args[6])
