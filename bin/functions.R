@@ -315,6 +315,7 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
     mutate(relPos = as.numeric(query_bin),
            flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint,
+           time = time,
            mir.type = mir.type,
            start.pos = start.pos) %>%
     dplyr::select(-seqnames, -query_bin) %>%
