@@ -50,7 +50,7 @@ snow <- SnowParam(workers = nProcs, type = 'SOCK')
 
 topMirs <-
   topMirCutoff %>%
-  group_by(flybase_id) %>%
+  group_by(bamFile) %>%
   do(muts = pileupParallelMuts(groupedData = ., snow = snow)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
