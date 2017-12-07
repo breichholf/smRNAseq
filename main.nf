@@ -428,7 +428,6 @@ process writeJson {
     samples.append({"id": idx,
                     "time": time,
                     "align": bam,
-                    "posFile": str(idx) + "_pos.tsv",
                     "sRNAreads": sRNAreads,
                     "miRNAreads": miRNAreads})
 
