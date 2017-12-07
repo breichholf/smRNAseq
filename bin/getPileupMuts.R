@@ -38,7 +38,7 @@ tidyRefNucs <-
 
 topMirCounts <-
   topPositions %>%
-  left_join(cfg$samples, by = c('timepoint' = 'id')) %>%
+  left_join(cfg$samples, by = c('timepoint' = 'id', 'time')) %>%
   mutate(bamFile = file.path(align)) %>%
   left_join(preMirTbl)
 
