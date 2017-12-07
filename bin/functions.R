@@ -180,7 +180,7 @@ convertLDtoWide <- function(lenDis, mir.type) {
 
   filteredLD <-
     lenDis %>%
-    filter(mir.type = !!mir.type) %>%
+    filter(mir.type == !!mir.type) %>%
     select(-reads, -bg.reads) %>%
     unite(lendis, LD.type, timepoint, time, sep = ".") %>%
     spread(lendis, bg.subtract)
