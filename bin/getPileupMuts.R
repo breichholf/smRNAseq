@@ -68,18 +68,19 @@ topMirMutCodes <-
   group_by(flybase_id, timepoint, pos) %>%
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl('>', mutCode)) %>%
-    arrange(flybase_id, time, relPos, mutCode) %>%
+    arrange(flybase_id, time, mir.type, relPos, mutCode) %>%
   ungroup()
 
 mirMutsWide <-
   topMirMutCodes %>%
-  group_by(flybase_id, timepoint, mutCode) %>%
+  group_by(flybase_id, time, start.pos, mutCode) %>%
     mutate(relMutCount = sprintf("%02d", rank(relPos)),
            relMut = paste(mutCode, relMutCount, sep = "_"),
-           relMut = str_replace(relMut, ">", "")) %>% ungroup() %>%
-    dplyr::select(flybase_id, timepoint, time, start.pos, depth, mutFract, relMut) %>%
+           relMut = str_replace(relMut, ">", "")) %>%
+  ungroup() %>%
+  dplyr::select(flybase_id, timepoint, time, mir.type, start.pos, depth, mutFract, relMut) %>%
   spread(relMut, mutFract) %>%
-  arrange(flybase_id, start.pos, time)
+  arrange(flybase_id, mir.type, time)
 
 topMirMutCodes %>% write_tsv('mutStats.tsv')
 mirMutsWide %>% write_tsv('allMirMuts.tsv')
