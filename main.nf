@@ -488,6 +488,9 @@ process mutationStats {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
+  export TMPDIR=/scratch-ii2/users/reichholf/tmp
+  export TMP=/scratch-ii2/users/reichholf/tmp
+  export TEMP=/scratch-ii2/users/reichholf/tmp
   getPileupMuts.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
   """
 }
