@@ -175,15 +175,37 @@ subtractTcBG <- function(lenDis, bgTime) {
   return(lenDisBgMinus)
 }
 
-convertLDtoWide <- function(lenDis, mir.type) {
-  mir.type <- enquo(mir.type)
+convertLDtoWide <- function(lenDis, mirType="all") {
+  require(purrr)
+
+  if ((mirType != "mature") && (mirType != "star")) {
+    mirType <- "mature|star"
+  }
 
   filteredLD <-
     lenDis %>%
-    filter(mir.type == !!mir.type) %>%
-    select(-reads, -bg.reads) %>%
-    unite(lendis, LD.type, timepoint, time, sep = ".") %>%
-    spread(lendis, bg.subtract)
+    filter(grepl(mirType, mir.type)) %>%
+    unite(lendis, LD.type, seqLen, sep = ".") %>%
+    select(-flybase_id, -mir_name, -`5p`, -`3p`, -timepoint) %>%
+    spread(lendis, reads) %>%
+    arrange(mir.type, desc(average.reads), time)
+
+  return(filteredLD)
+}
+
+convertTcLDtoWide <- function(lenDis, mirType="all") {
+  if ((mirType != "mature") && (mirType != "star")) {
+    mirType <- "mature|star"
+  }
+
+  filteredLD <-
+    lenDis %>%
+    filter(grepl(mirType, mir.type)) %>%
+    select(-reads, -bg.reads, -timepoint, -flybase_id,
+           -mir_name, -`5p`, -`3p`) %>%
+    unite(lendis, LD.type, seqLen, sep = ".") %>%
+    spread(lendis, bg.subtract) %>%
+    arrange(mir.type, desc(average.reads), time)
 
   return(filteredLD)
 }

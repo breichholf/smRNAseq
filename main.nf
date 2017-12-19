@@ -5,8 +5,8 @@
  *    - Take raw fastq files
  *    - Clip adapter sequence
  *    - Trim 4N from 5' and 3'
- *    - Collapse
- *    - Map to genome (for counting sRNA reads)
+ *    - Collapse *** IN PROGRESS ***
+ *    - Map to genome (for counting sRNA reads) *** IN PROGRESS ***
  *    - Align non-collapsed to miRNA hairpins (for QualityScore cutoffs)
  */
 
@@ -14,21 +14,9 @@
  *  Considerations / ToDo:
  *    - Add preprocessing steps?
  *        - Demultiplexing
- *        - Adapter clipping & Trimming
- *    - Write out json?
- *    - Get hairpin (FASTA) from genome + 20nt downstream
- *    - Build Hairpin index
- *    - align to hairpin
- *    - Add R postprocessing!
- *      - Get max positions
- *      - Get mutation rates
- *      - Get T>C read count
- *      - Get steady state read count
- *      - if available (json/align and count myself?) normalise read count to ppm
- *        if not: norm to miRNA(!) mapped reads
  */
 
-version = "0.5"
+version = "0.6"
 
 /*
  * Helper functions
@@ -43,7 +31,6 @@ String getOutDir(output_type) {
 params.genome = false
 params.mismatches = 3
 // Get genome files depending on --genome matched in impimba.config, if the genome is found and set on CLI.
-// params.index         = params.genome ? params.genomes[ params.genome ].bowtie ?: false : false
 params.genomeFasta   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.genomeAnno    = params.genome ? params.genomes[ params.genome ].genomeAnno ?: false : false
 params.mirArmAnno    = params.genome ? params.genomes[ params.genome ].mirArmAnno ?: false : false
@@ -358,17 +345,9 @@ process writeJson {
    *   `file sortedBams from hairpinSorted.collect()` takes care of staging
    *   This way `post_alignment` can still run in parallel, for each sample.
    *   Then `writeJson` will run after that is all done.
-   *   Currently we are NOT allowing normalisation by sRNA-mapping reads(!) and will
-   *   simply report raw counts instead.
-   *   To 'future proof' the R analysis, we have included the option for normalisation
-   *   but are simply setting that count to 1000000
-   *   Also, we're not handling time at the moment, but this would be an easy fix
-   *   once we move to a sample sheet.
+   *   Currently we only map, and take sRNAcounts from an externally provided sample file
    */
 
-  // !!!!
-  // Mode needs to change to "copy" if we're going to use the json file later on
-  // !!!!
   publishDir path: getOutDir('json'), mode: "copy", pattern: '*.json'
 
   input:
@@ -381,20 +360,6 @@ process writeJson {
 
   script:
   absOutDir = getOutDir('sortedAlignment')
-  /*
-   * This portion would only be useful to extract mapped reads
-   * Not incorporated right now
-   *
-  """
-  # for f in ${counts}; do
-  #   countBase=${f/.counts/}
-  #   awk -v name=${sortedBams} \
-  #     '{map += \$3; unmapped += \$4} END {printf "%s\t%d\t%d", name, map, unmapped}' $f \
-  #     > ${countBase}_countsum.txt;
-  # done
-  # echo $counts
-  """
-  */
 
   """
   #!/usr/bin/env python
@@ -443,7 +408,10 @@ process writeJson {
  *                             1) Count all reads and T>C reads with BQ>27
  *                             2) Length-specific background subtraction for TC reads
  *                             3) Separate miR and miR-STAR bg-subtracted T>C reads
- *                             4)
+ *                             4) Prepare raw data for scissor plots
+ *                                - Default norm to 3h (180 minutes) for comparison
+ *                                  between replicates
+ *                             5) Prepare length distribution data for nibbler plots
  */
 
 process alignmentStats {
@@ -458,8 +426,8 @@ process alignmentStats {
   file 'allCounts.tsv' into allCounts
   file 'topPositionCounts.tsv' into topPositions
   file 'rawLenDis.tsv' into tcReads
-  file 'steadyStateLenDis.tsv' into steadyStateLD
   file '*PPM.tsv' into ppmTSV
+  file 'steadyState*.tsv' into steadyStateTSV
   file 'bgMinus*.tsv' into bgSubtractedTSV
 
   script:
@@ -471,8 +439,9 @@ process alignmentStats {
 }
 
 /*
-  Pileups are read and processed in parallel using BiocParallel
-*/
+ *  STEP 5c: Postprocessing -- Process BAM files in parallel using BiocParallel
+ *                             -> Assess all mutations for top expressed (>50 ppm) miRs
+ */
 process mutationStats {
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 

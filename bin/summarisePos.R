@@ -39,6 +39,8 @@ gatheredCounts <-
   ungroup() %>% distinct()
 
 # Get best mapping 5p starting position and add 'mature' and 'star' nomenclature
+# If there are more than one position with equal reads, take the one closest to
+# manually annotated 3p/5p start position (posdist)
 topPositionCounts <-
   gatheredCounts %>%
   filter(read.type == "totalReads") %>%
@@ -46,6 +48,12 @@ topPositionCounts <-
     mutate(average.reads = mean(reads)) %>%
   group_by(arm.name) %>%
     top_n(1, average.reads) %>%
+    mutate(posdist = ifelse(str_sub(arm.name, -2) == "3p",
+                            `3p` - pos,
+                            `5p` - pos)) %>%
+  group_by(arm.name, average.reads) %>%
+    filter(posdist == min(posdist)) %>%
+    select(-posdist) %>%
   group_by(mir_name) %>%
     mutate(mir.type = ifelse(average.reads == max(average.reads), "mature", "star")) %>%
   ungroup()
@@ -76,11 +84,6 @@ gatheredLenDis <-
   left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, time, mir.type)) %>%
   filter(!is.na(mir.type))
 
-# Isolate length distribution for all reads only
-steadyStateLenDis <-
-  gatheredLenDis %>%
-  filter(LD.type == "totalLenDis")
-
 # Isolate length distribution for TC reads only
 # tcLenDis <-
 #   gatheredLenDis %>%
@@ -99,7 +102,6 @@ starWide <- convertToWide(topPosCntsWseed, "star")
 allcounts %>% write_tsv('allCounts.tsv')
 topPosCntsWseed %>% write_tsv('topPositionCounts.tsv')
 gatheredLenDis %>% write_tsv('rawLenDis.tsv')
-steadyStateLenDis %>% write_tsv('steadyStateLenDis.tsv')
 matureWide %>% write_tsv('miR.steadyState.PPM.tsv')
 starWide %>% write_tsv('miRSTAR.steadyState.PPM.tsv')
 # tcLenDis %>% write_tsv('tcLenDis.tsv')

@@ -5,8 +5,8 @@ args = commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
 rawTcLenDisFile <- as.character(args[2])
 topPosFile <- as.character(args[3])
-normLDtime <- as.numeric(args[4])
-maxTime <- as.numeric(args[5])
+bgTime <- as.numeric(args[4])
+normTime <- as.numeric(args[5])
 outDir <- as.character(args[6])
 
 source(file.path(scriptDir, "bin/functions.R"))
@@ -14,40 +14,93 @@ source(file.path(scriptDir, "bin/functions.R"))
 library(tidyverse)
 
 rawLenDis <- read_tsv(rawTcLenDisFile)
+topPositions <- read_tsv(topPosFile)
 
-tcLenDis <- rawLenDis %>% filter(LD.type == "tcLenDis")
+topPosLenDis <-
+  rawLenDis %>%
+  left_join(topPositions %>%
+    select(pos, flybase_id, average.reads) %>%
+    distinct()) %>%
+  filter(average.reads >= 50)
 
-bgMinusLD <- subtractTcBG(tcLenDis, bgTime = normLDtime)
+steadyStateLD <-
+  topPosLenDis %>%
+  filter(LD.type == "totalLenDis") %>%
+  mutate(LD.type == "ststateReads")
+
+tcLenDis <-
+  topPosLenDis %>%
+  filter(LD.type == "tcLenDis") %>%
+  mutate(LD.type = "tcReads")
+
+bgMinusLD <- subtractTcBG(tcLenDis, bgTime = bgTime)
 
 bgMinusReadSum <-
   bgMinusLD %>%
-  select(-seqLen, -reads, -bg.reads, -bg.subtract) %>%
+  select(-seqLen, -reads, -bg.reads, -bg.subtract,
+         -flybase_id, -mir_name, -`5p`, -`3p`) %>%
   distinct()
 
-maxReads <-
+normReads <-
   bgMinusReadSum %>%
-  filter(time == maxTime, mir.type == "mature") %>%
+  filter(time == normTime, mir.type == "mature") %>%
   select(flybase_id, LD.type, read.sum) %>%
-  rename(max.reads = read.sum)
+  rename(norm.reads = read.sum)
 
-bgMinusReadSum %>%
+####
+# Output section
+####
+#### Steady state length distributions -- Raw
+steadyStateLD %>% write_tsv(file.path(outDir, 'steadyState.raw.lendis.tsv'))
+
+#    converted to wide and split in to separate output for mature and star
+#    FOR NIBBLER PLOTS
+convertLDtoWide(steadyStateLD, "mature") %>% write_tsv(file.path(outDir, 'steadyState.miR.lendis.tsv'))
+convertLDtoWide(steadyStateLD, "star") %>% write_tsv(file.path(outDir, 'steadyState.miRSTAR.lendis.tsv'))
+
+#### TC Reads
+#    Background subtracted total reads
+#    Tidy format
+#    FOR PLOTS, calculation of kBIO FITS and REPLICATES
+bgMinusReadSum %>% write_tsv(file.path(outDir, 'bgMinus.tidy.raw.TcReads.tsv'))
+
+#    FOR SCISSOR PLOTS global
+bgMinusScissor <-
+  bgMinusReadSum %>%
   unite(lendis, LD.type, timepoint, time, sep = ".") %>%
   spread(lendis, read.sum) %>%
-  write_tsv(file.path(outDir, 'bgMinusTcReads.tsv'))
+  arrange(mir.type, desc(average.reads))
 
+bgMinusScissor %>% write_tsv(file.path(outDir, 'bgMinus.raw.TcReads.tsv'))
+
+bgMinusScissor %>%
+  filter(mir.type == "mature") %>%
+  write_tsv(file.path(outDir, 'bgMinus.miR.TcReads.tsv'))
+
+bgMinusScissor %>%
+  filter(mir.type == "star") %>%
+  write_tsv(file.path(outDir, 'bgMinus.miRSTAR.TcReads.tsv'))
+
+#    set mature miR Read count at normTime to 1
+#    convert to spread
+#    FOR SCISSOR PLOTS comparison amongst replicates
 bgMinusReadSum %>%
-  left_join(maxReads) %>%
-  mutate(read.norm = read.sum / max.reads) %>% select(-read.sum, max.reads) %>%
-  filter(time != normLDtime) %>%
+  left_join(normReads) %>%
+  mutate(read.norm = read.sum / norm.reads) %>% select(-read.sum, -norm.reads) %>%
+  filter(time != bgTime) %>%
   unite(lendis, LD.type, timepoint, time, sep = ".") %>%
   spread(lendis, read.norm) %>%
-  write_tsv(file.path(outDir, 'bgMinusNormReads.tsv'))
+  arrange(mir.type, desc(average.reads)) %>%
+  write_tsv(file.path(outDir, 'bgMinus.TcReads.Normalised.tsv'))
 
-bgMinusLD %>% write_tsv('bgMinusLenDis.tsv')
+#    Raw Background subtracted length distribution data
+bgMinusLD %>%
+  select(-flybase_id, -mir_name, -`5p`, -`3p`) %>%
+  arrange(mir.type, desc(average.reads), timepoint, seqLen) %>%
+  write_tsv(file.path(outDir, 'bgMinus.raw.TC-lendis.tsv'))
 
-## Include separate mature and star PPM
-matureLD <- convertLDtoWide(bgMinusLD, "mature")
-starLD <- convertLDtoWide(bgMinusLD, "star")
-
-matureLD %>% write_tsv('bgMinus.miR.lendis.tsv')
-starLD %>% write_tsv('bgMinus.miRSTAR.lendis.tsv')
+#   Separate mature and star length distributions
+#   miR and miRSTAR length distributions split
+#   FOR NIBBLER PLOTS
+convertTcLDtoWide(bgMinusLD, "mature") %>% write_tsv(file.path(outDir, 'bgMinus.miR.TC-lendis.tsv'))
+convertTcLDtoWide(bgMinusLD, "star") %>% write_tsv(file.path(outDir, 'bgMinus.miRSTAR.TC-lendis.tsv'))
