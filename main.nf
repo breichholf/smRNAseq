@@ -16,7 +16,7 @@
  *        - Demultiplexing
  */
 
-version = "0.6"
+version = "0.6.1"
 
 /*
  * Helper functions

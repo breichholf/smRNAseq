@@ -26,14 +26,13 @@ topPosLenDis <-
 steadyStateLD <-
   topPosLenDis %>%
   filter(LD.type == "totalLenDis") %>%
-  mutate(LD.type == "ststateReads")
+  mutate(LD.type == "stdyStateReads")
 
 tcLenDis <-
   topPosLenDis %>%
-  filter(LD.type == "tcLenDis") %>%
-  mutate(LD.type = "tcReads")
+  filter(LD.type == "tcLenDis")
 
-bgMinusLD <- subtractTcBG(tcLenDis, bgTime = bgTime)
+bgMinusLD <- subtractTcBG(tcLenDis, bgTime = bgTime) %>% mutate(LD.type = "tcReads")
 
 bgMinusReadSum <-
   bgMinusLD %>%
@@ -42,9 +41,9 @@ bgMinusReadSum <-
   distinct()
 
 normReads <-
-  bgMinusReadSum %>%
+  bgMinusLD %>%
   filter(time == normTime, mir.type == "mature") %>%
-  select(flybase_id, LD.type, read.sum) %>%
+  select(flybase_id, LD.type, read.sum) %>% distinct() %>%
   rename(norm.reads = read.sum)
 
 ####
