@@ -46,12 +46,12 @@ topMirCutoff <-
   topMirCounts %>%
   dplyr::filter(average.reads >= 50)
 
-snow <- MulticoreParam(workers = nProcs, type = 'SOCK')
+mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 
 topMirs <-
   topMirCutoff %>%
   group_by(bamFile) %>%
-  do(muts = pileupParallelMuts(groupedData = ., snow = snow)) %>%
+  do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
   left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx'))

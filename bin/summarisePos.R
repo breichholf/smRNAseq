@@ -32,7 +32,7 @@ gatheredCounts <-
   allcounts %>%
   select(-matches("LenDis"), -seqLen) %>%
   gather(type, reads, matches("Reads\\.")) %>%
-  separate(type, c("read.type", "timepoint", "time"), convert = TRUE) %>%
+  separate(type, c("read.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
   replace_na(list(reads = 0)) %>%
   group_by(flybase_id, pos, read.type, timepoint) %>%
     filter(reads == max(reads)) %>%
@@ -79,7 +79,7 @@ gatheredLenDis <-
   allcounts %>%
   select(-matches("Reads")) %>%
   gather(type, reads, matches("LenDis")) %>%
-  separate(type, c("LD.type", "timepoint", "time"), convert = TRUE) %>%
+  separate(type, c("LD.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
   left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, time, mir.type)) %>%
   filter(!is.na(mir.type))

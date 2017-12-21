@@ -291,7 +291,7 @@ onlyTCReads <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen = 
                          filter = onlyTCandNoNs)
 }
 
-pileupParallelMuts <- function(groupedData, snow) {
+pileupParallelMuts <- function(groupedData, mc.param) {
   suppressMessages(require(BiocParallel))
   suppressMessages(require(dplyr))
 
@@ -304,7 +304,7 @@ pileupParallelMuts <- function(groupedData, snow) {
 
   doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, time = t, pos = pos,
                     mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = 18),
-                    SIMPLIFY = FALSE, BPPARAM = snow)
+                    SIMPLIFY = FALSE, BPPARAM = mc.param)
 
   return(dplyr::bind_rows(doOut))
 }
