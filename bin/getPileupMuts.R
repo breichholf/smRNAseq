@@ -46,7 +46,7 @@ topMirCutoff <-
   topMirCounts %>%
   dplyr::filter(average.reads >= 50)
 
-snow <- SnowParam(workers = nProcs, type = 'SOCK')
+snow <- MulticoreParam(workers = nProcs, type = 'SOCK')
 
 topMirs <-
   topMirCutoff %>%
