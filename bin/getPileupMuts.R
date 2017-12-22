@@ -40,6 +40,7 @@ topMirCounts <-
   topPositions %>%
   left_join(cfg$samples, by = c('timepoint' = 'id', 'time')) %>%
   mutate(bamFile = file.path(align)) %>%
+  filter(!is.na(bamFile)) %>%
   left_join(preMirTbl)
 
 topMirCutoff <-
