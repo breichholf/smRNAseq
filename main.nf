@@ -237,12 +237,16 @@ process trim_adapter {
   script:
   prefix = reads.toString() - ~/(\.fq)?(\.fastq)?(\.gz)?$/
   """
+  zcat $reads | paste -d '\t' - - - - > column.fq
+
+  parallel --pipepart --line-buffer --round-robin -j ${task.cpus} -a column.fq "
+  tr '\t' '\n' | \
   cutadapt \
     -m 26 \
     -M 38 \
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
     -o ${prefix}.adapter_clipped.fq.gz \
-    $reads > ${prefix}.trim_report.txt
+    $reads" > ${prefix}.trim_report.txt
   """
 }
 
