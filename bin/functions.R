@@ -147,9 +147,11 @@ convertToWide <- function(gatheredAllCounts, mirType) {
     gatheredAllCounts %>%
     dplyr::filter(mir.type == !!mirType) %>%
     unite(lib, read.type, timepoint, time, sep = ".") %>%
-    mutate(arm.name = fct_reorder(arm.name, desc(average.reads))) %>%
-    dplyr::select(arm.name, pos, seed, UCount, average.reads, mir.type, lib, reads) %>%
-    spread(lib, reads)
+    mutate(arm.name = fct_reorder(arm.name, average.reads, desc=TRUE)) %>%
+    dplyr::select(arm.name, pos, seed, UCount, average.reads, mir.type, lib, totalReads) %>%
+    distinct() %>%
+    spread(lib, totalReads) %>%
+    arrange(desc(average.reads))
 
   return(output)
 }

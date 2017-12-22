@@ -12,7 +12,7 @@ source(file.path(scriptDir, "bin/functions.R"))
 setupRlibs(R_libs)
 
 library(tidyverse)
-library(purrr)
+library(Biostrings)
 
 sessionInfo()
 
@@ -45,7 +45,7 @@ topPositionCounts <-
   gatheredCounts %>%
   filter(read.type == "totalReads") %>%
   group_by(pos, flybase_id) %>%
-    mutate(average.reads = mean(reads)) %>%
+    mutate(average.reads = mean(totalReads)) %>%
   group_by(arm.name) %>%
     top_n(1, average.reads) %>%
     mutate(posdist = ifelse(str_sub(arm.name, -2) == "3p",
@@ -65,7 +65,8 @@ topPosCntsWseed <-
   mutate(seed = str_sub(full.seq, pos, pos + 7),
          mirBody = str_sub(full.seq, pos, pos + mirBodyLength - 1),
          UCount = str_count(mirBody, "T")) %>%
-  select(-mirBody, -full.seq)
+  select(-mirBody, -full.seq, -reads) %>%
+  distinct()
 
 # Isolate TC reads
 # topTcReads <-
@@ -81,7 +82,7 @@ gatheredLenDis <-
   gather(type, reads, matches("LenDis")) %>%
   separate(type, c("LD.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
-  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, time, mir.type)) %>%
+  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, read.type, timepoint, time, mir.type, totalReads)) %>%
   filter(!is.na(mir.type))
 
 # Isolate length distribution for TC reads only
