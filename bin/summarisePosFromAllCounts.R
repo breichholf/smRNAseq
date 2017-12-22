@@ -16,8 +16,6 @@ library(purrr)
 
 sessionInfo()
 
-cfg <- getcfg(jsonFile)
-
 preMirFasta <- readDNAStringSet(preMirFastaFile)
 preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta), "full.seq" = paste(preMirFasta)))
 
