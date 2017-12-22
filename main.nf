@@ -240,13 +240,9 @@ process trim_adapter {
   zcat $reads | paste -d '\t' - - - - > column.fq
 
   parallel --pipepart --line-buffer --round-robin -j ${task.cpus} -a column.fq "
-  tr '\t' '\n' | \
-  cutadapt \
-    -m 26 \
-    -M 38 \
+  tr '\t' '\n' | cutadapt -m 26 -M 38\
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
-    -o ${prefix}.adapter_clipped.fq.gz \
-    $reads" > ${prefix}.trim_report.txt
+    - 2>> ${prefix}.trim_report.txt" | gzip > ${prefix}.adapter_clipped.fq.gz
   """
 }
 
