@@ -238,12 +238,18 @@ process trim_adapter {
   script:
   prefix = reads.toString() - ~/(\.fq)?(\.fastq)?(\.gz)?$/
   """
-  zcat $reads | paste -d '\t' - - - - > column.fq
-
-  parallel --pipepart --line-buffer --round-robin -j ${task.cpus} -a column.fq "
-  tr '\t' '\n' | cutadapt -m 26 -M 38\
+  # zcat $reads | paste -d '\t' - - - - > column.fq
+  # Parallelism doesn't work just yet, joined adapter clipped file is not always grouped properly.
+  # parallel --pipepart --line-buffer --round-robin -j ${task.cpus} -a column.fq
+  # tr '\t' '\n' | cutadapt -m 26 -M 38\
+  #  -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+  #  - 2>> ${prefix}.trim_report.txt | gzip > ${prefix}.adapter_clipped.fq.gz
+  cutadapt \
+    -m 26 \
+    -M 38 \
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
-    - 2>> ${prefix}.trim_report.txt" | gzip > ${prefix}.adapter_clipped.fq.gz
+    -o ${prefix}.adapter_clipped.fq.gz \
+    $reads > ${prefix}.trim_report.txt
   """
 }
 
