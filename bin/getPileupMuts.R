@@ -4,7 +4,7 @@
 args <- commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
 R_libs <- as.character(args[2])
-nProcs <- as.numeric(args[3])
+nCores <- as.numeric(args[3])
 jsonFile <- as.character(args[4])
 topPosFile <- as.character(args[5])
 preMirFastaFile <- as.character(args[6])
@@ -46,6 +46,7 @@ topMirCutoff <-
   topMirCounts %>%
   dplyr::filter(average.reads >= 50)
 
+nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 
 topMirs <-
@@ -54,8 +55,8 @@ topMirs <-
   do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
-  left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx'))
-  # left_join(topMirCutoff, by = c('flybase_id', 'timepoint', 'mir.type', 'start.pos' = 'pos'))
+  left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx')) %>%
+  left_join(topMirCutoff %>% select(-bamFile), by = c('flybase_id', 'timepoint', 'time', 'mir.type', 'start.pos' = 'pos'))
 
 topMirMutCodes <-
   topMirs %>%
@@ -69,7 +70,9 @@ topMirMutCodes <-
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl('>', mutCode)) %>%
     arrange(flybase_id, time, mir.type, relPos, mutCode) %>%
-  ungroup()
+  ungroup() %>%
+  select(-flybase_id, -refNuc, -nucleotide, -count, -depth,
+         -`5p`, -`3p`, -mir_name, -read.type)
 
 mirMutsWide <-
   topMirMutCodes %>%
@@ -78,7 +81,7 @@ mirMutsWide <-
            relMut = paste(mutCode, relMutCount, sep = "_"),
            relMut = str_replace(relMut, ">", "")) %>%
   ungroup() %>%
-  dplyr::select(flybase_id, timepoint, time, mir.type, start.pos, depth, mutFract, relMut) %>%
+  dplyr::select(arm.name, mir.type, start.pos, seed, UCount, timepoint, time, depth, mutFract, relMut) %>%
   spread(relMut, mutFract) %>%
   arrange(flybase_id, mir.type, time)
 
