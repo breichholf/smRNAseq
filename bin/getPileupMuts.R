@@ -71,8 +71,7 @@ topMirMutCodes <-
     dplyr::filter(grepl('>', mutCode)) %>%
     arrange(flybase_id, time, mir.type, relPos, mutCode) %>%
   ungroup() %>%
-  select(-flybase_id, -refNuc, -nucleotide, -count, -depth,
-         -`5p`, -`3p`, -mir_name, -read.type)
+  select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type)
 
 mirMutsWide <-
   topMirMutCodes %>%
@@ -81,9 +80,9 @@ mirMutsWide <-
            relMut = paste(mutCode, relMutCount, sep = "_"),
            relMut = str_replace(relMut, ">", "")) %>%
   ungroup() %>%
-  dplyr::select(arm.name, mir.type, start.pos, seed, UCount, timepoint, time, depth, mutFract, relMut) %>%
+  dplyr::select(flybase_id, arm.name, mir.type, start.pos, seed, UCount, timepoint, time, average.reads, depth, mutFract, relMut) %>%
   spread(relMut, mutFract) %>%
-  arrange(flybase_id, mir.type, time)
+  arrange(mir.type, desc(average.reads), time)
 
 topMirMutCodes %>% write_tsv('mutStats.tsv')
 mirMutsWide %>% write_tsv('allMirMuts.tsv')
