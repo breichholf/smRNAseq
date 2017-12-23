@@ -28,8 +28,7 @@ gatheredLenDis <-
   separate(type, c("LD.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
   left_join(topPosCntsWseed %>%
-              select(flybase_id, pos, seed, UCount, read.type, timepoint, time, mir.type, average.reads) %>%
-              dplyr::rename(LD.type = read.type)) %>%
+              select(flybase_id, pos, seed, UCount, timepoint, time, mir.type, average.reads)) %>%
   filter(!is.na(mir.type))
 
 ####
