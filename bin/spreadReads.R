@@ -13,7 +13,7 @@ source(file.path(scriptDir, "bin/functions.R"))
 
 library(tidyverse)
 
-rawLenDis <- read_tsv(rawTcLenDisFile)
+rawLenDis <- read_tsv(rawTcLenDisFile) %>% select(-read.type)
 topPositions <- read_tsv(topPosFile)
 
 topPosLenDis <-
@@ -39,8 +39,7 @@ bgMinusLD <-
 
 bgMinusReadSum <-
   bgMinusLD %>%
-  select(-seqLen, -reads, -bg.reads, -bg.subtract,
-         -flybase_id, -mir_name, -`5p`, -`3p`) %>%
+  select(-seqLen, -reads, -bg.reads, -bg.subtract, -mir_name, -`5p`, -`3p`) %>%
   distinct()
 
 normReads <-
@@ -57,8 +56,8 @@ steadyStateLD %>% write_tsv(file.path(outDir, 'steadyState.raw.lendis.tsv'))
 
 #    converted to wide and split in to separate output for mature and star
 #    FOR NIBBLER PLOTS
-convertLDtoWide(steadyStateLD, "mature") %>% select(-read.type) %>% write_tsv(file.path(outDir, 'steadyState.miR.lendis.tsv'))
-convertLDtoWide(steadyStateLD, "star") %>% select(-read.type) %>% write_tsv(file.path(outDir, 'steadyState.miRSTAR.lendis.tsv'))
+convertLDtoWide(steadyStateLD, "mature") %>% write_tsv(file.path(outDir, 'steadyState.miR.lendis.tsv'))
+convertLDtoWide(steadyStateLD, "star") %>% write_tsv(file.path(outDir, 'steadyState.miRSTAR.lendis.tsv'))
 
 #### TC Reads
 #    Background subtracted total reads
@@ -87,7 +86,7 @@ bgMinusScissor %>%
 #    convert to spread
 #    FOR SCISSOR PLOTS comparison amongst replicates
 bgMinusReadSum %>%
-  left_join(normReads) %>%
+  left_join(normReads) %>% select(-flybase_id) %>%
   mutate(read.norm = read.sum / norm.reads) %>% select(-read.sum, -norm.reads) %>%
   filter(time != bgTime) %>%
   unite(lendis, LD.type, timepoint, time, sep = ".") %>%
