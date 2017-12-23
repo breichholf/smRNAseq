@@ -26,13 +26,16 @@ topPosLenDis <-
 steadyStateLD <-
   topPosLenDis %>%
   filter(LD.type == "totalLenDis") %>%
-  mutate(LD.type == "stdyStateReads")
+  mutate(LD.type = "stdyStateReads")
 
 tcLenDis <-
   topPosLenDis %>%
   filter(LD.type == "tcLenDis")
 
-bgMinusLD <- subtractTcBG(tcLenDis, bgTime = bgTime) %>% mutate(LD.type = "tcReads")
+bgMinusLD <-
+  subtractTcBG(tcLenDis, bgTime = bgTime) %>%
+  mutate(LD.type = "tcReads") %>%
+  select(-read.type)
 
 bgMinusReadSum <-
   bgMinusLD %>%
@@ -44,7 +47,7 @@ normReads <-
   bgMinusLD %>%
   filter(time == normTime, mir.type == "mature") %>%
   select(flybase_id, LD.type, read.sum) %>% distinct() %>%
-  rename(norm.reads = read.sum)
+  dplyr::rename(norm.reads = read.sum)
 
 ####
 # Output section
@@ -54,8 +57,8 @@ steadyStateLD %>% write_tsv(file.path(outDir, 'steadyState.raw.lendis.tsv'))
 
 #    converted to wide and split in to separate output for mature and star
 #    FOR NIBBLER PLOTS
-convertLDtoWide(steadyStateLD, "mature") %>% write_tsv(file.path(outDir, 'steadyState.miR.lendis.tsv'))
-convertLDtoWide(steadyStateLD, "star") %>% write_tsv(file.path(outDir, 'steadyState.miRSTAR.lendis.tsv'))
+convertLDtoWide(steadyStateLD, "mature") %>% select(-read.type) %>% write_tsv(file.path(outDir, 'steadyState.miR.lendis.tsv'))
+convertLDtoWide(steadyStateLD, "star") %>% select(-read.type) %>% write_tsv(file.path(outDir, 'steadyState.miRSTAR.lendis.tsv'))
 
 #### TC Reads
 #    Background subtracted total reads

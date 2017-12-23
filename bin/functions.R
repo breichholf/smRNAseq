@@ -167,7 +167,7 @@ subtractTcBG <- function(lenDis, bgTime) {
     replace_na(list(reads = 0))
 
   lenDisBgMinus <-
-    lenDis %>% left_join(bgLD %>% rename(bg.reads = reads)) %>%
+    lenDis %>% left_join(bgLD %>% dplyr::rename(bg.reads = reads)) %>%
     replace_na(list(bg.reads = 0)) %>%
     mutate(bg.subtract = ifelse(reads - bg.reads > 0, reads - bg.reads, 0)) %>%
     group_by(pos, flybase_id, LD.type, timepoint) %>%
@@ -178,7 +178,6 @@ subtractTcBG <- function(lenDis, bgTime) {
 }
 
 convertLDtoWide <- function(lenDis, mirType="all") {
-  require(purrr)
 
   if ((mirType != "mature") && (mirType != "star")) {
     mirType <- "mature|star"
