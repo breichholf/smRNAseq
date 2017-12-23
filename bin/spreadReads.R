@@ -13,7 +13,7 @@ source(file.path(scriptDir, "bin/functions.R"))
 
 library(tidyverse)
 
-rawLenDis <- read_tsv(rawTcLenDisFile) %>% select(-read.type)
+rawLenDis <- read_tsv(rawTcLenDisFile)
 topPositions <- read_tsv(topPosFile)
 
 topPosLenDis <-
@@ -34,8 +34,7 @@ tcLenDis <-
 
 bgMinusLD <-
   subtractTcBG(tcLenDis, bgTime = bgTime) %>%
-  mutate(LD.type = "tcReads") %>%
-  select(-read.type)
+  mutate(LD.type = "tcReads")
 
 bgMinusReadSum <-
   bgMinusLD %>%
