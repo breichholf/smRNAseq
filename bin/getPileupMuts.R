@@ -70,7 +70,6 @@ topMirMutCodes <-
   group_by(flybase_id, timepoint, pos) %>%
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl('>', mutCode)) %>%
-    arrange(flybase_id, time, mir.type, relPos, mutCode) %>%
   ungroup() %>%
   select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type)
 

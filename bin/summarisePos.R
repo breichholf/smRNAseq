@@ -36,9 +36,8 @@ gatheredCounts <-
   separate(type, c("read.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
   replace_na(list(reads = 0)) %>%
   group_by(flybase_id, pos, read.type, timepoint) %>%
-    mutate(totalReads = sum(reads)) %>%
     select(-seqLen) %>% distinct() %>%
-    filter(totalReads == max(totalReads)) %>%
+    filter(reads == max(reads)) %>%
   ungroup() %>% distinct()
 
 # Get best mapping 5p starting position and add 'mature' and 'star' nomenclature
@@ -48,7 +47,7 @@ topPositionCounts <-
   gatheredCounts %>%
   filter(read.type == "totalReads") %>%
   group_by(pos, flybase_id) %>%
-    mutate(average.reads = mean(totalReads)) %>%
+    mutate(average.reads = mean(reads)) %>%
   group_by(arm.name) %>%
     top_n(1, average.reads) %>%
     mutate(posdist = ifelse(str_sub(arm.name, -2) == "3p",
@@ -68,7 +67,7 @@ topPosCntsWseed <-
   mutate(seed = str_sub(full.seq, pos, pos + 7),
          mirBody = str_sub(full.seq, pos, pos + mirBodyLength - 1),
          UCount = str_count(mirBody, "T")) %>%
-  select(-mirBody, -full.seq, -reads) %>%
+  select(-mirBody, -full.seq) %>%
   distinct()
 
 # Isolate TC reads
@@ -85,7 +84,7 @@ gatheredLenDis <-
   gather(type, reads, matches("LenDis")) %>%
   separate(type, c("LD.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
-  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, read.type, timepoint, time, mir.type, totalReads)) %>%
+  left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, read.type, timepoint, time, mir.type, reads)) %>%
   filter(!is.na(mir.type))
 
 # Isolate length distribution for TC reads only
