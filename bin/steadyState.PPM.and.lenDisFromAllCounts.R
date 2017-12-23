@@ -6,7 +6,6 @@ scriptDir <- as.character(args[1])
 R_libs <- as.character(args[2])
 allCountsFile <- as.character(args[3])
 topPositionsFile <- as.character(args[4])
-experiment <- as.character(args[5])
 
 source(file.path(scriptDir, "bin/functions.R"))
 setupRlibs(R_libs)
