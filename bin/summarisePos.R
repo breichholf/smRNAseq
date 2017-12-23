@@ -26,11 +26,11 @@ mirBodyLength <- 18
 
 # `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
 # also includes lengths
-allcounts <- cfg$samples %>% pmap(get.top.startpos, mirAnno = cfg$anno) %>% purrr::reduce(full_join)
+allCounts <- cfg$samples %>% pmap(get.top.startpos, mirAnno = cfg$anno) %>% purrr::reduce(full_join)
 
 # Converting to tidy format, and omitting length distribution.
 gatheredCounts <-
-  allcounts %>%
+  allCounts %>%
   select(-matches("LenDis")) %>%
   gather(type, reads, matches("Reads\\.")) %>%
   separate(type, c("read.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
@@ -78,7 +78,7 @@ topPosCntsWseed <-
 #   left_join(topPosCntsWseed %>% select(flybase_id, pos, seed, UCount, timepoint, time, mir.type, average.reads)) %>%
 #   filter(!is.na(mir.type))
 
-# Convert `allcounts` to tidy format for length distributions (all reads and tc reads)
+# Convert `allCounts` to tidy format for length distributions (all reads and tc reads)
 gatheredLenDis <-
   allCounts %>%
   select(-matches("Reads")) %>%
@@ -103,7 +103,7 @@ starWide <- convertToWide(topPosCntsWseed, "star")
 # matureTcWide <- convertToWide(topTcReads, "mature")
 # starTcWide <- convertToWide(topTcReads, "star")
 
-allcounts %>% write_tsv('allCounts.tsv')
+allCounts %>% write_tsv('allCounts.tsv')
 topPosCntsWseed %>% write_tsv('topPositionCounts.tsv')
 gatheredLenDis %>% write_tsv('rawLenDis.tsv')
 matureWide %>% write_tsv('miR.steadyState.PPM.tsv')
