@@ -3,7 +3,7 @@
 # Command line arguments
 args = commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
-rawTcLenDisFile <- as.character(args[2])
+rawLDFile <- as.character(args[2])
 topPosFile <- as.character(args[3])
 bgTime <- as.numeric(args[4])
 normTime <- as.numeric(args[5])
@@ -13,7 +13,7 @@ source(file.path(scriptDir, "bin/functions.R"))
 
 library(tidyverse)
 
-rawLenDis <- read_tsv(rawTcLenDisFile)
+rawLenDis <- read_tsv(rawLDFile)
 topPositions <- read_tsv(topPosFile)
 
 topPosLenDis <-

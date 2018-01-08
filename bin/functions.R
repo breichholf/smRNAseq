@@ -161,18 +161,55 @@ subtractTcBG <- function(lenDis, bgTime) {
 
   bgTime <- enquo(bgTime)
 
-  bgLD <-
-    lenDis %>% filter(LD.type == "tcLenDis", time == !!bgTime) %>%
-    select(pos, seqLen, flybase_id, LD.type, reads) %>%
+  # Initial definition of background: reads @ 0h (bgTime)
+  # bgLD <-
+  #   lenDis %>% filter(LD.type == "tcLenDis", time == !!bgTime) %>%
+  #   select(pos, seqLen, flybase_id, LD.type, reads) %>%
+  #   replace_na(list(reads = 0))
+
+  # lenDisBgMinus <-
+  #   lenDis %>% left_join(bgLD %>% dplyr::rename(bg.reads = reads)) %>%
+  #   replace_na(list(bg.reads = 0)) %>%
+  #   mutate(bg.subtract = ifelse(reads - bg.reads > 0, reads - bg.reads, 0)) %>%
+  #   group_by(pos, flybase_id, LD.type, timepoint) %>%
+  #     mutate(read.sum = sum(bg.subtract, na.rm = TRUE)) %>%
+  #   ungroup()
+
+  # New definition of background:
+  # reads at any length need to exceed tc/steady state ratio @ bgTime
+  bgLD.all <-
+    lenDis %>%
+    filter(time == !!bgTime) %>%
     replace_na(list(reads = 0))
 
+  bgCutoff <-
+    bgLD.all %>%
+    filter(LD.type == "totalLenDis") %>%
+    select(-LD.type) %>%
+    left_join(bgLD.all %>%
+              filter(LD.type == "tcLenDis") %>%
+              select(-LD.type) %>%
+              dplyr::rename(tcReads = reads)) %>%
+    group_by(pos, flybase_id) %>%
+      mutate(cutoff = sum(tcReads) / sum(reads)) %>%
+    ungroup() %>%
+    select(pos, flybase_id, cutoff) %>% distinct()
+
+  bgLD <-
+    lenDis %>%
+    filter(LD.type == "totalLenDis") %>%
+    replace_na(list(reads = 0)) %>%
+    left_join(bgCutoff) %>%
+    group_by(pos, flybase_id) %>%
+      mutate(tcCutoff = cutoff * sum(reads)) %>%
+    ungroup() %>%
+    select(pos, flybase_id, cutoff, tcCutoff) %>%
+    distinct()
+
   lenDisBgMinus <-
-    lenDis %>% left_join(bgLD %>% dplyr::rename(bg.reads = reads)) %>%
-    replace_na(list(bg.reads = 0)) %>%
-    mutate(bg.subtract = ifelse(reads - bg.reads > 0, reads - bg.reads, 0)) %>%
-    group_by(pos, flybase_id, LD.type, timepoint) %>%
-      mutate(read.sum = sum(bg.subtract, na.rm = TRUE)) %>%
-    ungroup()
+    lenDis %>% filter(LD.type == "tcReads") %>%
+    left_join(bgLD) %>%
+    mutate(bg.minus = ifelse(reads > tcCutoff, reads, 0))
 
   return(lenDisBgMinus)
 }
