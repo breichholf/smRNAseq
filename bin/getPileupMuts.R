@@ -51,13 +51,13 @@ nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 
 topMirs <-
-  topMirCutoff %>%
+  topMirCounts %>%
   group_by(bamFile) %>%
   do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
   left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx')) %>%
-  left_join(topMirCutoff %>% select(-bamFile), by = c('flybase_id', 'timepoint', 'time', 'mir.type', 'start.pos' = 'pos'))
+  left_join(topMirCounts %>% select(-bamFile), by = c('flybase_id', 'timepoint', 'time', 'mir.type', 'start.pos' = 'pos'))
 
 topMirMutCodes <-
   topMirs %>%
