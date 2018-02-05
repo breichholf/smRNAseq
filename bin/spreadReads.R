@@ -38,7 +38,7 @@ bgMinusLD <-
 
 bgMinusReadSum <-
   bgMinusLD %>%
-  select(-seqLen, -reads, -bg.reads, -bg.subtract, -mir_name, -`5p`, -`3p`) %>%
+  select(-seqLen, -reads, -mir_name, -`5p`, -`3p`) %>%
   distinct()
 
 normReads <-

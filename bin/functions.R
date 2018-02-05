@@ -137,6 +137,72 @@ get.top.startpos <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 
   return(r.sum.max.pos)
 }
 
+# 1) Reads bam
+# 2) Filters out reads that don't map with in +/- 5 of annotated 5p and 3p arms
+# 3) Counts all reads (and all TC reads with BQ>27) for given starting position
+# 4) Assesses read lengths
+# 5) Normalises reads to sRNAreads provided in cfg file
+getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, ...) {
+  suppressMessages(require(tidyverse))
+  suppressMessages(require(Rsamtools))
+  mapInfo <- c("rname", "strand", "pos")
+  mapParams <- ScanBamParam(what = c(mapInfo, "seq"), tag = c("TC", "TN"),
+                            flag = scanBamFlag(isMinusStrand = FALSE, isUnmappedQuery = FALSE))
+  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
+  filterBam <- filterBam(align, tempfile(), filter = filterNs)
+  bam <- scanBam(filterBam, param = mapParams)
+  # Now this will ONLY handle files that have tags TC and TN, too!
+  map.r <- dplyr::bind_cols(do.call(dplyr::bind_cols, bam[[1]][mapInfo]),
+                            list("seqLen" = width(bam[[1]]$seq)),
+                            do.call(dplyr::bind_cols, bam[[1]]$tag))
+
+  totalReadCounts <-
+    map.r %>%
+    group_by(rname, pos, seqLen) %>% summarise(lenDis = n()) %>%
+    group_by(rname, pos) %>% mutate(totalReads = sum(lenDis)) %>% ungroup() %>%
+    mutate(flybase_id = as.character(rname))
+
+  tcReadCounts <-
+    map.r %>%
+    dplyr::filter(!is.na(TC)) %>%
+    group_by(rname, pos, seqLen) %>% summarise(tcLenDis = n()) %>%
+    group_by(rname, pos) %>% mutate(tcReads = sum(tcLenDis)) %>% ungroup() %>%
+    mutate(flybase_id = as.character(rname)) %>%
+    dplyr::select(-rname)
+
+  read.summary <-
+    totalReadCounts %>%
+    left_join(tcReadCounts, by = c("flybase_id", "pos", "seqLen")) %>%
+    replace_na(list(totalReads = 0, lenDis = 0, tcReads = 0, tcLenDis = 0)) %>%
+    left_join(mirAnno, by = "flybase_id") %>%
+    dplyr::select(-rname, -loop)
+
+  read.summary.closestArms <-
+    read.summary %>%
+    dplyr::filter((pos >= `5p` - 5 & pos <= `5p` + 5) | (pos >= `3p` - 5 & pos <= `3p` + 5)) %>%
+    mutate(arm.name = ifelse(pos >= `5p` - 5 & pos <= `5p` + 5,
+                             paste0(str_sub(mir_name, 5, -1), "-5p"),
+                             paste0(str_sub(mir_name, 5, -1), "-3p")))
+
+  totalRName <- paste("totalReads", id, time, sep = ".")
+  tcRName <- paste("tcReads", id, time, sep = ".")
+  totalLDname <- paste("totalLenDis", id, time, sep = ".")
+  tcLDname <- paste("tcLenDis", id, time, sep = ".")
+
+  read.summary.topnPos <-
+    read.summary.closestArms %>%
+    group_by(arm.name) %>%
+    top_n(n = topn, wt = totalReads) %>% ungroup() %>%
+    mutate(totalReads = totalReads / sRNAreads * 1000000,
+           tcReads = tcReads / sRNAreads * 1000000,
+           lenDis = lenDis / sRNAreads * 1000000,
+           tcLenDis = tcLenDis / sRNAreads * 1000000) %>%
+    dplyr::rename_(.dots = setNames(c("totalReads", "tcReads", "lenDis", "tcLenDis"),
+                                    c(totalRName, tcRName, totalLDname, tcLDname)))
+
+  return(read.summary.topnPos)
+}
+
 convertToWide <- function(gatheredAllCounts, mirType) {
   suppressMessages(require(dplyr))
   suppressMessages(require(forcats))

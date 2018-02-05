@@ -16,7 +16,7 @@
  *        - Demultiplexing
  */
 
-version = "0.6.2"
+version = "0.6.5"
 
 /*
  * Helper functions
@@ -422,32 +422,36 @@ process writeJson {
  */
 
 process alignmentStats {
-
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:
   file readCountConfig
   file hairpinFasta
-
-  output:
+  /*
   file 'allCounts.tsv' into allCounts
   file 'topPositionCounts.tsv' into topPositions
   file 'rawLenDis.tsv' into tcReads
   file '*PPM.tsv' into ppmTSV
   file 'steadyState*.tsv' into steadyStateTSV
-  file 'bgMinus*.tsv' into bgSubtractedTSV
+  file 'bgMinus*.tsv' into bgSubtractedTSV */
+
+  output:
+  file 'allCounts.tsv' into allCounts
+  file 'filteredPositions.tsv' into topPositions
+  file 'filteredLenDis.tsv' into lendisTSV
 
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  summarisePos.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
-  spreadReads.R $baseDir rawLenDis.tsv topPositionCounts.tsv 0 180 ./
+  # summarisePos.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
+  # spreadReads.R $baseDir rawLenDis.tsv topPositionCounts.tsv 0 180 ./
+  getAllCounts.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
   """
 }
 
 /*
  *  STEP 5c: Postprocessing -- Process BAM files in parallel using BiocParallel
- *                             -> Assess all mutations for top expressed (>50 ppm) miRs
+ *                             -> Assess all mutations for miRs >0 ppm at all timepoints
  */
 process mutationStats {
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
@@ -467,7 +471,8 @@ process mutationStats {
   export TMPDIR=/scratch-ii2/users/reichholf/tmp
   export TMP=/scratch-ii2/users/reichholf/tmp
   export TEMP=/scratch-ii2/users/reichholf/tmp
-  getPileupMuts.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
+  # getPileupMuts.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
+  getMutStats.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
   """
 }
 
