@@ -37,6 +37,8 @@ idCount <- dim(id)[1]
 #  - tcLenDis.<libID>    tcReads.<libID>    totalLenDis.<libID>    totalReads.<libID>
 allCounts <- cfg$samples %>% pmap(getAllCounts, mirAnno = cfg$anno) %>% purrr::reduce(full_join)
 
+allCounts %>% write_tsv('allCounts.tsv')
+
 # Long format of tcReads and totalReads - only 1 entry per starting position and miR name
 # In the wide format, there might be some lengths that are present in one timepoint but not the other.
 # When converting to long, these would be represented as NA in 'totalReads'. To get around that,
@@ -92,6 +94,5 @@ gatheredLenDis.gtZero <-
   distinct()
 
 # Save all files -- there is no label yet which is mature and which is star!
-allCounts %>% write_tsv('allCounts.tsv')
 gatheredCounts.gtZero %>% write_tsv('filteredPositions.tsv')
 gatheredLenDis.gtZero %>% write_tsv('filteredLenDis.tsv')
