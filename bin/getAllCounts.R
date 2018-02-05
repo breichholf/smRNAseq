@@ -57,7 +57,7 @@ gatheredCounts <-
 nonZeroPos <-
   gatheredCounts %>%
   filter(read.type == "totalReads", reads != 0) %>%
-  group_by(pos, flybase_id) %>% mutate(libCount == n()) %>% ungroup() %>%
+  group_by(pos, flybase_id) %>% mutate(libCount = n()) %>% ungroup() %>%
   filter(libCount == idCount) %>%
   select(pos, flybase_id, mir_name, arm.name, reads) %>% distinct() %>%
   group_by(pos, flybase_id) %>% mutate(average.ppm = mean(reads)) %>%
