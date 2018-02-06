@@ -27,7 +27,7 @@ mirBodyLength <- 18
 
 # How many IDs do we have? Should correspond with unique entries in cfg$samples
 ids <- cfg$samples %>% select(id) %>% distinct()
-idCount <- dim(id)[1]
+idCount <- dim(ids)[1]
 
 # `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
 # General columns (pos = start position):
@@ -67,7 +67,7 @@ nonZeroPos <-
   group_by(mir_name) %>%
     mutate(mir.type = ifelse(arm.reads == max(arm.reads), "mature", "star")) %>%
   ungroup() %>%
-  select(-arm.reads) %>%
+  select(-arm.reads, -reads) %>% distinct() %>%
   left_join(preMirTbl) %>%
   mutate(seed = str_sub(full.seq, pos, pos + 7),
          mirBody = str_sub(full.seq, pos, pos + mirBodyLength - 1),
