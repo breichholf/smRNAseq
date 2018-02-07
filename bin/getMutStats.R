@@ -43,7 +43,8 @@ mirPosWFiles <-
   left_join(cfg$samples, by = c('timepoint' = 'id', 'time')) %>%
   mutate(bamFile = file.path(align)) %>%
   dplyr::filter(!is.na(align)) %>%
-  left_join(preMirTbl)
+  left_join(preMirTbl) %>%
+  filter(average.ppm >= 5)
 
 nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
