@@ -58,6 +58,8 @@ mirsWmuts <-
   left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx')) %>%
   left_join(mirPosWFiles %>% dplyr::select(-bamFile), by = c('flybase_id', 'timepoint', 'time', 'mir.type', 'start.pos' = 'pos'))
 
+mirsWmuts %>% write_tsv('miRs.wAllMuts.tsv')
+
 mirMutCodes <-
   mirsWmuts %>%
   spread(nucleotide, count) %>%
@@ -84,6 +86,5 @@ mirMutsWide <-
   arrange(mir.type, desc(average.reads), time)
 
 # Write out files
-mirsWmuts %>% write_tsv('miRs.wAllMuts.tsv')
 mirMutCodes %>% write_tsv('mirMutCodes.tsv')
 mirMutsWide %>% write_tsv('mirMutsWide.tsv')
