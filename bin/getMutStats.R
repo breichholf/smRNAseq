@@ -44,7 +44,8 @@ mirPosWFiles <-
   mutate(bamFile = file.path(align)) %>%
   dplyr::filter(!is.na(align)) %>%
   left_join(preMirTbl) %>%
-  filter(average.ppm >= 5)
+  dplyr::filter(average.ppm >= 5, read.type == "totalReads") %>%
+  dplyr::rename(totalReads = reads)
 
 nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
@@ -82,9 +83,9 @@ mirMutsWide <-
            relMut = paste(mutCode, relMutCount, sep = "_"),
            relMut = str_replace(relMut, ">", "")) %>%
   ungroup() %>%
-  dplyr::select(flybase_id, arm.name, mir.type, start.pos, seed, UCount, timepoint, time, average.reads, depth, mutFract, relMut) %>%
+  dplyr::select(flybase_id, arm.name, mir.type, start.pos, seed, UCount, timepoint, time, average.ppm, depth, mutFract, relMut) %>%
   spread(relMut, mutFract) %>%
-  arrange(mir.type, desc(average.reads), time)
+  arrange(mir.type, desc(average.ppm), time)
 
 # Write out files
 mirMutCodes %>% write_tsv('mirMutCodes.tsv')
