@@ -70,7 +70,7 @@ mirMutCodes <-
   mutate(mutCode = ifelse(refNuc != nucleotide,
                           paste(refNuc, nucleotide, sep = '>'),
                           refNuc)) %>%
-  group_by(flybase_id, timepoint, pos) %>%
+  group_by(flybase_id, timepoint, pos, start.pos) %>%
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl('>', mutCode)) %>%
   ungroup() %>%

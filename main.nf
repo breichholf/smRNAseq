@@ -412,7 +412,7 @@ process writeJson {
 
 /*
  *  STEP 5b: Postprocessing -- Getting alignment statistics for miR hairpin mappers
- *                             1) Count all reads and T>C reads with BQ>27
+ *                             1) Count all reads and T>C reads with T>C BQ>27
  *                             2) Length-specific background subtraction for TC reads
  *                             3) Separate miR and miR-STAR bg-subtracted T>C reads
  *                             4) Prepare raw data for scissor plots
@@ -427,13 +427,6 @@ process alignmentStats {
   input:
   file readCountConfig
   file hairpinFasta
-  /*
-  file 'allCounts.tsv' into allCounts
-  file 'topPositionCounts.tsv' into topPositions
-  file 'rawLenDis.tsv' into tcReads
-  file '*PPM.tsv' into ppmTSV
-  file 'steadyState*.tsv' into steadyStateTSV
-  file 'bgMinus*.tsv' into bgSubtractedTSV */
 
   output:
   file 'allCounts.tsv' into allCounts
@@ -443,8 +436,6 @@ process alignmentStats {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  # summarisePos.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
-  # spreadReads.R $baseDir rawLenDis.tsv topPositionCounts.tsv 0 180 ./
   getAllCounts.R $baseDir ${params.rlocation} $readCountConfig $hairpinFasta
   """
 }
@@ -464,6 +455,7 @@ process mutationStats {
   output:
   file 'miRs.wAllMuts.tsv' into mutStats
   file 'mirMutCodes.tsv' into mirMuts
+  file 'mirMutsWide.tsv' into wideMuts
 
   script:
   """
@@ -471,7 +463,6 @@ process mutationStats {
   export TMPDIR=/scratch-ii2/users/reichholf/tmp
   export TMP=/scratch-ii2/users/reichholf/tmp
   export TEMP=/scratch-ii2/users/reichholf/tmp
-  # getPileupMuts.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
   getMutStats.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
   """
 }

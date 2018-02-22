@@ -423,7 +423,7 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
   start.pos <- pos
   end.pos <- start.pos + 30
 
-  pparam <- PileupParam(query_bins = seq(0,30), max_depth=10000000, min_mapq=0, min_base_quality=0)
+  pparam <- PileupParam(query_bins = seq(0,30), max_depth=50000000, min_mapq=0, min_base_quality=0)
   sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
                          which=GRanges(miR, IRanges(start.pos, end.pos)))
 
