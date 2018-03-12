@@ -218,11 +218,11 @@ maxmut <-
 fits <-
   muts.noBG %>%
   filter(mutCode == "T>C") %>%
-  left_join(maxmut) %>%
-  group_by(flybase_id, start.pos, time) %>%
-  mutate(avg.mut = mean(bg.minus.mut)) %>%
-  select(-bg.minus.mut, -relPos, -pos) %>%
-  distinct() %>% arrange(mir.type, desc(average.ppm))
+  # left_join(maxmut) %>%
+  # group_by(flybase_id, start.pos, time) %>%
+  # mutate(avg.mut = mean(bg.minus.mut)) %>%
+  # select(-bg.minus.mut, -relPos, -pos) %>%
+  # distinct() %>% arrange(mir.type, desc(average.ppm))
   group_by(flybase_id, start.pos) %>%
   do(fit.one = nlsLM(bg.minus.mut ~ Plat * (1 - exp(-k * time)),
                      start = list(Plat = 1, k = 0.5),
@@ -336,6 +336,25 @@ k.bio <-
   select(-term, -(std.error:p.value)) %>%
   dplyr::rename(k.bio = estimate)
 
+k.bio.five <-
+  tc.filtered %>% filter(time <= 5) %>%
+  group_by(experiment, arm.name, pos) %>%
+  do(fit = lm(lab.corrected.reads ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>% dplyr::rename(k.bio.5 = estimate)
+
+k.bio.thirty <-
+  tc.filtered %>% filter(time <= 30) %>%
+  group_by(experiment, arm.name, pos) %>%
+  do(fit = lm(lab.corrected.reads ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>% dplyr::rename(k.bio.30 = estimate)
+
+k.bio.total <-
+  left_join(k.bio.five, k.bio) %>%
+  left_join(k.bio.thirty)
+
+
 mut.ppm <-
   muts.wFracts %>%
   left_join(bg.muts) %>%
@@ -344,7 +363,7 @@ mut.ppm <-
   filter(mutCode == "T>C") %>%
   group_by(flybase_id, start.pos, time) %>%
   mutate(avg.mut = mean(bg.minus.mut),
-         mut.ppm = avg.mut * totalReads / UCount,
+         mut.ppm = avg.mut * totalReads,
          mut.ppm.lab.norm = mut.ppm / top.plateau) %>%
   select(-mutCode, -bg.minus.mut) %>%
   distinct()
@@ -357,6 +376,24 @@ k.bio.ppm <-
   ungroup() %>%
   select(-term, -(std.error:p.value)) %>%
   dplyr::rename(k.bio.ppm = estimate)
+
+k.bio.ppm.five <-
+  mut.ppm %>% filter(time <= 5) %>%
+  group_by(arm.name, start.pos) %>%
+  do(fit = lm(mut.ppm.lab.norm ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>% dplyr::rename(k.bio.ppm.5 = estimate)
+
+k.bio.ppm.thirty <-
+  mut.ppm %>% filter(time <= 30) %>%
+  group_by(arm.name, start.pos) %>%
+  do(fit = lm(mut.ppm.lab.norm ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>% dplyr::rename(k.bio.ppm.30 = estimate)
+
+k.bio.ppm.total <-
+  left_join(k.bio.ppm.five, k.bio.ppm) %>%
+  left_join(k.bio.ppm.thirty)
 
 ###
 # Fig 2 data (ppm also for fig 3)
@@ -400,8 +437,81 @@ bio.vs.ppm.only <-
   select(arm.name, mir.type, fit.select, average.ppm, k.bio, k.bio.ppm, k.decay) %>%
   distinct()
 
+bio.vs.ppm.only %>%
+  write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tc.bio.vs.fraction.bio.tsv')
+
 bg.muts %>% left_join(final.filter.lendis %>% select(flybase_id, pos, arm.name, mir_name, mir.type) %>% distinct(), by = c('flybase_id', 'start.pos' = 'pos'))
 
+bio.vs.ppm.total <-
+  tc.filtered %>%
+  filter(experiment == "Ago2KO-24h") %>%
+  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
+  left_join(k.bio.total, by = c("pos", "arm.name", "experiment")) %>%
+  left_join(mirs.wExpFits.wRates, by = c("flybase_id", "arm.name", "mir.type", "average.ppm", 'pos' = 'start.pos')) %>%
+  left_join(k.bio.ppm.total, by = c('arm.name', 'pos' = 'start.pos'))
+
+bio.vs.ppm.total.only <-
+  bio.vs.ppm.total %>%
+  filter(!is.na(fit.select)) %>%
+  select(arm.name, mir.type, fit.select, average.ppm, k.bio.5, k.bio, k.bio.30, k.bio.ppm.5, k.bio.ppm, k.bio.ppm.30, k.decay) %>%
+  distinct()
+
+bio.vs.ppm.total.ppm.hl <-
+  bio.vs.ppm.total.only %>%
+  mutate(hl = log(2) / k.decay,
+         average.ppm.hl = average.ppm / 2) %>%
+  select(arm.name, mir.type, fit.select, average.ppm, hl, average.ppm.hl)
+
+bio.vs.ppm.total.decay <-
+  bio.vs.ppm.total.ppm.hl %>%
+  gather(time, ppm, starts_with('average.ppm')) %>%
+  mutate(time = ifelse(time == "average.ppm", 0, hl)) %>%
+  left_join(bio.vs.ppm.total %>% filter(!is.na(fit.select)) %>%
+              select(arm.name, mir.type, average.ppm) %>% distinct()) %>%
+  group_by(arm.name, mir.type, average.ppm) %>%
+  do(fit = lm(ppm ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>%
+  dplyr::rename(k.decay.to.hl = estimate)
+
+bio.vs.ppm.fulltbl <-
+  bio.vs.ppm.total.only %>%
+  left_join(bio.vs.ppm.total.ppm.hl %>% select(-average.ppm.hl)) %>%
+  left_join(bio.vs.ppm.total.decay) %>%
+  mutate(pair = str_sub(arm.name, 1, -4)) %>%
+  select(arm.name, pair, everything())
+
+bio.vs.ppm.fulltbl %>%
+  write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/biogenesis.vs.decay.tsv')
+
+bio.vs.ppm.miR.fulltbl <-
+  bio.vs.ppm.fulltbl %>%
+  select(-(k.bio.5:k.bio.ppm)) %>%
+  rename(k.bio = k.bio.ppm.30, optimal.fit = fit.select) %>%
+  filter(mir.type == "mature")
+
+bio.vs.ppm.miRSTAR.fulltbl <-
+  bio.vs.ppm.fulltbl %>%
+  filter(mir.type == "star") %>%
+  select(-arm.name, -mir.type, -(k.bio.5:k.bio.ppm)) %>%
+  rename(miRSTAR.k.bio = k.bio.ppm.30, miRSTAR.fit = fit.select,
+         miRSTAR.ppm = average.ppm, miRSTAR.k.decay = k.decay,
+         miRSTAR.hl = hl, miRSTAR.k.decay.to.hl = k.decay.to.hl)
+
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs <-
+  left_join(bio.vs.ppm.miR.fulltbl, bio.vs.ppm.miRSTAR.fulltbl) %>%
+  filter(average.ppm >= 100, miRSTAR.ppm >= 100)
+
+# From clustering
+fast.miRs <- c('mir-184', 'mir-275', 'mir-13b-2', 'mir-8', 'bantam', 'mir-14')
+medium.miRs <- c('mir-2b-2', 'mir-282', 'mir-276a', 'mir-277', 'mir-305', 'mir-34')
+slow.miRs <- c('mir-980', 'mir-965', 'mir-317', 'mir-33', 'mir-995', 'mir-306')
+
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped <-
+  bio.vs.ppm.fulltbl.miR_miRSTAR.pairs %>%
+  mutate(class = ifelse(pair %in% fast.miRs, "fast",
+                   ifelse(pair %in% medium.miRs, "medium",
+                     ifelse(pair %in% slow.miRs, "slow", 'unknown'))))
 
 totalReads <-
   final.filter.lendis %>%
@@ -436,6 +546,32 @@ tc.filtered %>%
   filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name),
          experiment == "Ago2KO-24h", mutCode == "T>C") %>%
   write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tcReads.vs.mutation.rate.tsv')
+
+tc.filtered %>%
+  left_join(avg.muts.wFracts, by = c("flybase_id", "mir.type", "timepoint", "average.ppm", "time", 'pos' = 'start.pos')) %>%
+  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name),
+         experiment == "Ago2KO-24h", mutCode == "T>C") %>%
+  group_by(experiment, flybase_id, start.pos, time, mutCode) %>%
+  mutate(relMutCount = rank(relPos, ties.method = "first"),
+         relMut = sprintf("%s_%02d", mutCode, relMutCount)) %>%
+  ungroup()
+
+ago2ko.muts <-
+  muts.noBG %>%
+  filter(average.ppm >= 100, mutCode == "T>C") %>%
+  group_by(flybase_id, start.pos, time, mutCode) %>%
+  mutate(relMutCount = rank(relPos, ties.method = "first"),
+         relMut = sprintf("%s_%02d", mutCode, relMutCount),
+         experiment = "Ago2KO") %>%
+  ungroup() %>%
+  select(arm.name, start.pos, mir.type, seed, UCount, time, timepoint, totalReads, average.ppm, bg.minus.mut, relMut, experiment) %>%
+  rename(average.reads = average.ppm,
+         muts.bgMinus.norm = bg.minus.mut)
+  
+  select(-mutCode, -relMutCount, -relPos, -sRNAreads, -pos) %>%
+  mutate(relMut = paste0("ago2ko.", relMut)) %>%
+  spread(relMut, mutFract)
+
 
   
 
@@ -649,3 +785,66 @@ wavg.len.wide %>%
   left_join(wavg.delta.wide) %>%
   filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
   write_tsv(file.path(outPath, 'merged.wavg-lens.tsv'))
+
+### PCA of factors dictating steady state abundance
+library(ggfortify)
+
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>% select(average.ppm, k.bio, miRSTAR.k.decay.to.hl, hl)), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, colour = "class")
+
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca <- bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>% mutate(average.ppm = log10(average.ppm), k.bio = log(k.bio), miRSTAR.k.decay.to.hl = log(miRSTAR.k.decay.to.hl), hl = log(hl)) %>% select(average.ppm, k.bio, miRSTAR.k.decay.to.hl, hl)
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, colour = "class", label = TRUE)
+row.names(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca) <- bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped$pair
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, colour = "class", label = TRUE)
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, colour = "class", label = TRUE, loadings = TRUE, loadings.label = TRUE)
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>% select(-optimal.fit, -miRSTAR.fit)
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>% select(pair, average.ppm, k.bio, miRSTAR.k.decay.to.hl, hl, class)
+pca.test <- prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca)
+
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.raw <-
+  as.matrix(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>%
+              select(average.ppm, k.bio, miRSTAR.k.decay.to.hl, hl))
+
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log <-
+  as.matrix(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>%
+              mutate(average.ppm = log10(average.ppm), k.bio = log(k.bio),
+                     miRSTAR.k.decay.to.hl = log(miRSTAR.k.decay.to.hl), hl = log(hl)) %>%
+              select(average.ppm, k.bio, miRSTAR.k.decay.to.hl, hl))
+
+bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank <-
+  as.matrix(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped %>%
+              mutate(average.ppm = rank(desc(average.ppm)), k.bio = rank(desc(k.bio)),
+                     miRSTAR.k.decay.to.hl = rank(desc(miRSTAR.k.decay.to.hl)), hl = rank(desc(hl))) %>%
+              select(average.ppm, k.bio, miRSTAR.k.decay.to.hl, hl))
+
+row.names(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.raw) <- bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped$pair
+row.names(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log) <- bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped$pair
+row.names(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank) <- bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped$pair
+
+# Contribution in %
+abs.load.raw <- abs(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.raw, scale = TRUE)$rotation)
+abs.load.log <- abs(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log, scale = TRUE)$rotation)
+abs.load.rank <- abs(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank)$rotation)
+
+sweep(abs.load.raw, 2, colSums(abs.load.raw), "/")
+sweep(abs.load.log, 2, colSums(abs.load.log), "/")
+sweep(abs.load.rank, 2, colSums(abs.load.rank), "/")
+
+abs.load.raw.noppm <- abs(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.raw[,-1], scale = TRUE)$rotation)
+abs.load.log.noppm <- abs(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log[,-1], scale = TRUE)$rotation)
+abs.load.rank.noppm <- abs(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank[,-1])$rotation)
+
+sweep(abs.load.raw.noppm, 2, colSums(abs.load.raw.noppm), "/")
+sweep(abs.load.log.noppm, 2, colSums(abs.load.log.noppm), "/")
+sweep(abs.load.rank.noppm, 2, colSums(abs.load.rank.noppm), "/")
+
+# Plots
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.raw, scale = TRUE), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log, scale = TRUE), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
+
+# No average.ppm
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.raw[,-1], scale = TRUE), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log[,-1], scale = TRUE), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
+autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank[,-1]), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
+
+
