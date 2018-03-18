@@ -74,18 +74,12 @@ lendis.cutoff.filtered <-
   mutate(reads.filtered = ifelse(LD.type == "totalLenDis", reads,
                                  ifelse(reads > cutoff + 1e-7, reads, 0))) # if LD.type == "tcLenDis"
 
-# Still needs to be done:
-#   - for T>C ppm: multiply with labelling efficiency
-#   - biogenesis: linear fit through 0, 5, 15
-#   - miR/miRstar pairs: 'raw' ppm, common timepoints, normalise against miR maximum at 3h
-#   - half lives: split replicates
+# Short timecourse
+short.mutsF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/miRs.wAllMuts.tsv'
+short.muts <- read_tsv(short.mutsF)
 
-# First, we need to estimate labelling efficiency. To do this, we load the mutation file
-mutsF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/miRs.wAllMuts.tsv'
-muts <- read_tsv(mutsF)
-
-muts.wFracts.test <-
-  muts %>%
+short.muts.wFracts <-
+  short.muts %>%
   filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
   spread(nucleotide, count) %>%
   replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
@@ -96,7 +90,42 @@ muts.wFracts.test <-
   group_by(flybase_id, timepoint, pos, start.pos) %>%
   mutate(depth = sum(count), mutFract = count / depth) %>%
   dplyr::filter(grepl('>', mutCode)) %>%
-  ungroup()
+  ungroup() %>%
+  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type, -depth, -miRNAreads)
+
+short.bg.muts <-
+  short.muts.wFracts %>%
+  filter(time == 0) %>%
+  dplyr::rename(bg.mut = mutFract) %>%
+  select(pos, relPos, flybase_id, start.pos, mutCode, bg.mut)
+
+short.muts.noBG <-
+  short.muts.wFracts %>%
+  left_join(short.bg.muts) %>%
+  mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-7, mutFract - bg.mut, 0)) %>%
+  select(-mutFract, -bg.mut) %>%
+  filter(time > 0)
+
+short.tc.only <-
+  short.muts.noBG %>%
+  filter(grepl("T>C", mutCode)) %>%
+  group_by(flybase_id, time, start.pos, mutCode) %>%
+  mutate(relMutCount = sprintf("%02d", rank(relPos)),
+         relMut = paste(mutCode, relMutCount, sep = "_"),
+         relMut = str_replace(relMut, ">", "")) %>%
+  ungroup() %>%
+  dplyr::select(arm.name, mir.type, mir.type, start.pos, seed, UCount, timepoint, time, average.ppm, totalReads, bg.minus.mut, relMut) %>%
+  spread(relMut, bg.minus.mut) %>%
+  arrange(mir.type, desc(average.ppm))
+
+short.tc.only %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/tc.mutations.tsv')
+
+# Long Timecourse
+# First, we need to estimate labelling efficiency. To do this, we load the mutation file
+mutsF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/miRs.wAllMuts.tsv'
+mutsSF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/miRs.wAllMuts.tsv'
+muts <- dplyr::bind_rows(read_tsv(mutsF), read_tsv(mutsSF))
+
 
 muts.wFracts <-
   muts %>%
@@ -111,13 +140,14 @@ muts.wFracts <-
   mutate(depth = sum(count), mutFract = count / depth) %>%
   dplyr::filter(grepl('>', mutCode)) %>%
   ungroup() %>%
+  left_join(expDF) %>%
   dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type, -depth, -miRNAreads)
 
 bg.muts <-
   muts.wFracts %>%
   filter(time == 0) %>%
   dplyr::rename(bg.mut = mutFract) %>%
-  select(pos, relPos, flybase_id, start.pos, mutCode, bg.mut)
+  select(pos, relPos, flybase_id, start.pos, experiment, mutCode, bg.mut)
 
 muts.noBG <-
   muts.wFracts %>%
@@ -141,7 +171,8 @@ tc.only <-
 tc.only %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tc.mutations.tsv')
 
 muts.wFracts %>%
-  filter(average.ppm >= 100, mutCode == "T>C") %>%
+  filter(average.ppm >= 100, mutCode == "T>C", experiment == "Ago2KO-24h") %>%
+  select(-experiment) %>%
   group_by(arm.name, start.pos, time, mutCode) %>%
   mutate(avg.mut.pct = mean(mutFract) * 100) %>%
   ungroup() %>%
@@ -149,14 +180,13 @@ muts.wFracts %>%
   write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tc.mutations.gt100ppm.tidy.tsv')
 
 muts.wFracts %>%
-  filter(average.ppm >= 100, mutCode == "T>C") %>%
+  filter(average.ppm >= 100, mutCode == "T>C", experiment == "Ago2KO-24h") %>% select(-experiment) %>%
   write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tc.mutations.gt100ppm.tidy.tsv')
-
 
 muts.wFracts.and.avg <-
   muts.wFracts %>%
   filter(average.ppm >= 100, mutCode == "T>C") %>%
-  group_by(arm.name, start.pos, time, mutCode) %>%
+  group_by(arm.name, start.pos, experiment, time, mutCode) %>%
   mutate(avg.mut.pct = mean(mutFract) * 100) %>%
   ungroup() %>%
   arrange(mir.type, desc(average.ppm), time)
@@ -169,7 +199,6 @@ foo <-
 bootresults <- boot(data=foo, statistic=Bmean, R=10000)
 plot(bootresults)
 boot.ci(bootresults, type = c('norm', 'basic', 'perc', 'bca'))
-
 
 mir.meta <-
   muts.noBG %>%
@@ -217,7 +246,7 @@ maxmut <-
   
 fits <-
   muts.noBG %>%
-  filter(mutCode == "T>C") %>%
+  filter(mutCode == "T>C", experiment == "Ago2KO-24h") %>% select(-experiment) %>%
   # left_join(maxmut) %>%
   # group_by(flybase_id, start.pos, time) %>%
   # mutate(avg.mut = mean(bg.minus.mut)) %>%
@@ -358,6 +387,7 @@ k.bio.total <-
 mut.ppm <-
   muts.wFracts %>%
   left_join(bg.muts) %>%
+  filter(experiment == "Ago2KO-24h") %>% select(-experiment) %>%
   mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-9, mutFract - bg.mut, 0)) %>%
   select(-pos, -relPos, -mutFract, -bg.mut, -sRNAreads) %>%
   filter(mutCode == "T>C") %>%
@@ -410,6 +440,23 @@ tc.filtered %>%
   spread(exp, tc.read.sum) %>%
   write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tc.filtered.reads.wKbio.tsv')
 
+# Mut-based
+mut.based.ppm.summary <-
+  left_join(mirs.wExpFits.wRates, mut.ppm) %>%
+  ungroup() %>%
+  left_join(k.bio.ppm.thirty) %>%
+  select(arm.name, start.pos, mir.type, seed, UCount, average.ppm, totalReads, k.bio.ppm.30,
+         fit.select, k.decay, timepoint, time, avg.mut, mut.ppm, mut.ppm.lab.norm) %>%
+  arrange(mir.type, desc(average.ppm))
+
+mut.based.ppm.summary %>%
+  select(-totalReads, -avg.mut, -mut.ppm) %>%
+  mutate(libInfo = "tcReads") %>%
+  filter(time > 0) %>%
+  unite(lib, libInfo, timepoint, time, sep = ".") %>%
+  spread(lib, mut.ppm.lab.norm) %>%
+  write_tsv(file.path(outPath, 'merged.tcMutReads.wKbio.wide.tsv'))
+
 mir.mirstar.bios <-
   tc.filtered %>%
   select(-tcReads, -totalReads, -cutoff, -lab.corrected.reads, -LD.type) %>%
@@ -420,7 +467,11 @@ mir.mirstar.bios <-
   select(arm.name, mir.type, fit.select, average.ppm, k.bio, k.decay) %>%
   distinct()
 
-mut.ppm %>% left_join(tc.filtered %>% select(-cutoff, -LD.type, -mir_name, -experiment), by = c("flybase_id", "timepoint", "time", "mir.type", "arm.name", "average.ppm", "seed", "UCount", "totalReads", 'start.pos' = 'pos')) %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/frac.labelled.vs.total.reads.tsv')
+mut.ppm %>%
+  left_join(tc.filtered %>% select(-cutoff, -LD.type, -mir_name, -experiment),
+            by = c("flybase_id", "timepoint", "time", "mir.type", "arm.name",
+                   "average.ppm", "seed", "UCount", "totalReads", 'start.pos' = 'pos')) %>%
+  write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/frac.labelled.vs.total.reads.tsv')
 
 
 bio.vs.ppm <-
@@ -572,9 +623,6 @@ ago2ko.muts <-
   mutate(relMut = paste0("ago2ko.", relMut)) %>%
   spread(relMut, mutFract)
 
-
-  
-
 bio.vs.ppm.only %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/tc.bio.vs.fraction.bio.tsv')
 
 mirstar.bios <-
@@ -606,7 +654,7 @@ source.expression.w.miRbio <-
               select(-tcReads, -totalReads, -cutoff, -lab.corrected.reads, -LD.type,
                      -labelling.efficiency, -tc.read.sum, -timepoint, -time) %>%
               distinct() %>%
-              left_join(k.bio) %>%
+              left_join(k.bio.ppm.thirty) %>%
               select(-experiment) %>%
               mutate(locus = str_replace(str_sub(arm.name, 1, -4), 'mir', 'miR'),
                      locus = ifelse(str_sub(arm.name, 1, -6) == "mir-2a", "miR-2a",
@@ -614,7 +662,7 @@ source.expression.w.miRbio <-
             by = 'locus') %>%
   arrange(mir.type, desc(average.ppm)) %>%
   select(-matches('qs'), -matches('ucsd'), -matches('net'), -matches('sark'), -flybase_id, -mir_name) %>%
-  select(locus, arm.name, pos, mir.type, UCount, seed, average.ppm, k.bio, everything()) %>%
+  select(locus, arm.name, pos, mir.type, UCount, seed, average.ppm, k.bio.ppm.30, everything()) %>%
   mutate(cistronic = ifelse(locus == 'miR-2a', 'miR-2a/b',
                       ifelse(locus == 'miR-275' | locus == 'miR-305', 'miR-275,miR-305',
                        ifelse(locus == 'miR-11' | locus == 'miR-998', 'miR-11,miR-998',
@@ -716,6 +764,27 @@ normed.tc.reads %>%
   spread(lib.name, tc.read.sum) %>%
   arrange(mir.type, desc(Ago2KO.24h.ppm)) %>%
   write_tsv(file.path(outPath, 'merged.tc-reads-over-time.tsv'))
+
+muts.wFracts %>%
+  left_join(bg.muts) %>%
+  mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-9, mutFract - bg.mut, 0)) %>%
+  select(-pos, -relPos, -mutFract, -bg.mut, -sRNAreads) %>%
+  filter(mutCode == "T>C") %>%
+  group_by(flybase_id, start.pos, timepoint) %>%
+  mutate(avg.mut = mean(bg.minus.mut), experiment = "mut.TCreads",
+         mut.ppm = avg.mut * totalReads) %>%
+  ungroup() %>%
+  select(-bg.minus.mut) %>% distinct() %>%
+  filter(time > 0) %>%
+  unite(lib, experiment, timepoint, time, sep = ".") %>%
+  left_join(avg.ppm.spread) %>%
+  left_join(k.bio.ppm.thirty) %>%
+  rename(k.bio = k.bio.ppm.30) %>%
+  select(-average.ppm, -totalReads, -mutCode, -avg.mut) %>%
+  spread(lib, mut.ppm) %>%
+  arrange(mir.type, desc(Ago2KO.24h.ppm)) %>%
+  write_tsv(file.path(outPath, 'merged.tc-reads-over-time.long-short.wBio.tsv'))
+
 
 normed.tc.reads %>%
   filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
@@ -848,3 +917,109 @@ autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.log[,-1], scale
 autoplot(prcomp(bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped.pca.rank[,-1]), data = bio.vs.ppm.fulltbl.miR_miRSTAR.pairs.grouped, loadings = TRUE, loadings.label = TRUE, label = TRUE, colour = 'class')
 
 
+##########################
+# Recalculation of kbio using T>C mut rate * totalReads
+
+all.muts <- dplyr::bind_rows(muts.noBG, short.muts.noBG) %>% left_join(expDF)
+
+all.muts.tcOnly <-
+  all.muts %>%
+  filter(mutCode == "T>C") %>%
+  mutate(mut.based.ppm = bg.minus.mut * totalReads) %>%
+  group_by(experiment, time, timepoint, flybase_id, start.pos, arm.name, mir.type, average.ppm) %>% 
+  mutate(avg.mut.based.ppm = mean(mut.based.ppm)) %>%
+  ungroup() %>%
+  arrange(experiment, mir.type, desc(average.ppm), time)
+
+tcReadSum.and.mutPPM <-
+  all.muts.tcOnly %>%
+  left_join(tc.filtered %>%
+              select(pos, flybase_id, mir_name, timepoint, labelling.efficiency, tc.read.sum),
+            by = c("start.pos" = 'pos', "flybase_id", "timepoint"))
+
+# k.bio.ppm.total already showed that tc-mut based biogenesis rate is fastest
+mutPPM.bio <-
+  tcReadSum.and.mutPPM %>%
+  filter(time <= 15) %>%
+  # mutate(time = time / 60) %>%
+  select(experiment, arm.name, start.pos, relPos, time, avg.mut.based.ppm, mut.based.ppm, labelling.efficiency) %>%
+  mutate(label.ppm = mut.based.ppm / labelling.efficiency) %>% filter(!is.na(labelling.efficiency)) %>%
+  group_by(experiment, arm.name, start.pos) %>%
+  do(fit = lm(label.ppm ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>%
+  dplyr::rename(k.bio = estimate)
+
+normed.tc.reads %>%
+  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
+  select(arm.name, pos, seed, UCount, lib.name, tc.read.sum, labelling.efficiency) %>%
+  mutate(lib.name = str_replace(lib.name, "stdy.state", "tc.labelled")) %>%
+  left_join(norm.mir.types) %>%
+  left_join(k.bio.spread) %>%
+  left_join(avg.ppm.spread) %>%
+  spread(lib.name, tc.read.sum) %>%
+  arrange(mir.type, desc(Ago2KO.24h.ppm))
+
+tcMutPPM <-
+  tcReadSum.and.mutPPM %>%
+  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
+  select(arm.name, start.pos, mir.type, relPos, seed, UCount, average.ppm, labelling.efficiency, mutCode, experiment, timepoint, time, mut.based.ppm, avg.mut.based.ppm)
+
+tcMutPPM %>%
+  filter(experiment == "Ago2KO-24h") %>%
+  mutate(avg.label.ppm = avg.mut.based.ppm / labelling.efficiency) %>%
+  select(-mut.based.ppm, -avg.mut.based.ppm, -relPos, -mutCode) %>% distinct() %>%
+  mutate(experiment = "tcMutPPM") %>%
+  unite(lib, experiment, timepoint, time, sep = ".") %>%
+  spread(lib, avg.label.ppm) %>%
+  arrange(mir.type, desc(average.ppm)) %>%
+  write_tsv(file.path(outPath, 'merged.tcMut-based.ppm.over.time.tsv'))
+
+tcMutPPM %>%
+  select(-mut.based.ppm, -relPos, -labelling.efficiency) %>% distinct() %>%
+  mutate(mutCode = "raw_tcMutPPM") %>%
+  unite(lib, mutCode, timepoint, time, sep = ".") %>%
+  spread(lib, avg.mut.based.ppm) %>%
+  arrange(experiment, mir.type, desc(average.ppm)) %>%
+  write_tsv(file.path(outPath, 'merged.long-and-short.raw.tcMut-based.ppm.over.time.tsv'))
+
+
+muts.ltc1.F <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/M3987 - Ago2KO 24h R1/raw/miRs.wAllMuts.tsv'
+muts.ltc2.F <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/M4134 - Ago2KO 24h R2/raw/miRs.wAllMuts.tsv'
+muts.ltc.single <- dplyr::bind_rows(read_tsv(muts.ltc1.F), read_tsv(muts.ltc2.F))
+
+ltc1 <- c(45493:45501)
+ltc2 <- c(47117:47125)
+
+expDF.single <- as_data_frame(list("experiment" = c(rep('Ago2KO-24h-R1', length(ltc1)),
+                                                    rep('Ago2KO-24h-R2', length(ltc2))),
+                                   'timepoint' = c(ltc1, ltc2)))
+
+muts.single.wFracts <-
+  muts.ltc.single %>%
+  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
+  spread(nucleotide, count) %>%
+  replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
+  gather(nucleotide, count, A:T) %>%
+  mutate(mutCode = ifelse(refNuc != nucleotide,
+                          paste(refNuc, nucleotide, sep = '>'),
+                          refNuc)) %>%
+  group_by(flybase_id, timepoint, pos, start.pos) %>%
+  mutate(depth = sum(count), mutFract = count / depth) %>%
+  dplyr::filter(grepl('>', mutCode)) %>%
+  ungroup() %>%
+  left_join(expDF.single) %>%
+  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type, -depth, -miRNAreads)
+
+bg.muts.single <-
+  muts.single.wFracts %>%
+  filter(time == 0) %>%
+  dplyr::rename(bg.mut = mutFract) %>%
+  select(pos, relPos, flybase_id, start.pos, experiment, mutCode, bg.mut)
+
+muts.single.noBG <-
+  muts.single.wFracts %>%
+  left_join(bg.muts.single) %>%
+  mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-7, mutFract - bg.mut, 0)) %>%
+  select(-mutFract, -bg.mut) %>%
+  filter(time > 0)
