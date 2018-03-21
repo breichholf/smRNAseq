@@ -1023,3 +1023,120 @@ muts.single.noBG <-
   mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-7, mutFract - bg.mut, 0)) %>%
   select(-mutFract, -bg.mut) %>%
   filter(time > 0)
+
+# Calculate labelling efficiency first:
+fits.single <-
+  muts.single.noBG %>%
+  filter(mutCode == "T>C") %>%
+  group_by(flybase_id, start.pos, experiment) %>%
+  do(fit.one = tryCatch(nlsLM(bg.minus.mut ~ Plat * (1 - exp(-k * time)),
+                              start = list(Plat = 1, k = 0.5),
+                              upper = c(Inf, Inf), lower = c(0, 0),
+                              control = nls.lm.control(maxiter = 1000),
+                              na.action = na.omit, data = .),
+                        error = function(err) {
+                          return(NULL)
+                        }),
+     fit.two = tryCatch(wrapnlsr(bg.minus.mut ~ (Plat * pFast * 0.01) * (1 - exp(-kFast * time)) + (Plat * (100 - pFast) * 0.01) * (1 - exp(-kSlow * time)),
+                                 start = list(Plat = 0.1, kFast = 0.65194720, kSlow = 0.43463147, pFast = 50),
+                                 lower = c(0, 0, 0, 0), upper = c(Inf, Inf, Inf, 100),
+                                 trace = FALSE,
+                                 data = .),
+                        error = function(err) {
+                          return(NULL)
+                        }))
+
+bothFits.single <- fits.single %>% filter(!is.null(fit.two), !is.null(fit.one))
+
+whichFits.single <-
+  bind_cols(bothFits.single, bothFits.single %>% do(aov = anova(.$fit.one, .$fit.two))) %>%
+  tidy(aov) %>%
+  filter(!is.na(p.value)) %>%
+  mutate(fit.select = ifelse(p.value >= 0.05, 'one.phase', 'two.phase')) %>%
+  select(flybase_id, start.pos, fit.select, experiment) %>%
+  bind_rows(fits.single %>%
+              filter(is.null(fit.two), !is.null(fit.one)) %>%
+              mutate(fit.select = "one.phase") %>%
+              select(flybase_id, start.pos, fit.select, experiment))
+
+selectedFits.single <- left_join(fits.single, whichFits.single) %>% filter(!is.na(fit.select))
+
+mir.meta.single <-
+  muts.single.noBG %>%
+  select(flybase_id, start.pos, arm.name, mir.type, experiment, average.ppm) %>%
+  distinct()
+
+mirs.wExpFits.single <- left_join(mir.meta.single, selectedFits.single)
+
+mirs.wExpFits.wRates.single <-
+  mirs.wExpFits.single %>%
+  filter(!is.na(fit.select)) %>%
+  mutate(actual.fit = ifelse(fit.select == "two.phase", fit.two, fit.one)) %>%
+  rowwise() %>%
+  tidy(actual.fit) %>%
+  filter(term == "k" | term == "kFast") %>%
+  select(-(std.error:p.value), -term) %>%
+  dplyr::rename(k.decay = estimate)
+
+top.onephase.miRstar.single <-
+  mirs.wExpFits.single %>%
+  filter(mir.type == "star", fit.select == "one.phase", average.ppm >= 50) %>%
+  rowwise() %>%
+  tidy(fit.one) %>%
+  ungroup()
+
+top.mirstar.by.hl.single <-
+  top.onephase.miRstar.single %>%
+  filter(term == "k", mir.type == "star", average.ppm >= 100) %>%
+  group_by(experiment) %>%
+  top_n(10, estimate)
+
+top.plateaus.single <-
+  top.mirstar.by.hl.single %>%
+  select(flybase_id, start.pos, arm.name, experiment) %>%
+  left_join(mirs.wExpFits.single) %>%
+  rowwise() %>%
+  tidy(fit.one) %>%
+  filter(term == "Plat") %>%
+  ungroup() %>%
+  group_by(experiment) %>%
+  summarise(mean.p = mean(estimate))
+
+mut.single.ppm <-
+  muts.single.wFracts %>%
+  left_join(bg.muts.single) %>%
+  # filter(experiment == "Ago2KO-24h") %>% select(-experiment) %>%
+  mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-9, mutFract - bg.mut, 0)) %>%
+  select(-pos, -relPos, -mutFract, -bg.mut, -sRNAreads) %>%
+  filter(mutCode == "T>C") %>%
+  left_join(top.plateaus.single %>% rename(labelling.efficiency = mean.p)) %>%
+  group_by(flybase_id, start.pos, time, experiment) %>%
+  mutate(avg.mut = mean(bg.minus.mut),
+         mut.ppm = avg.mut * totalReads,
+         mut.ppm.lab.norm = mut.ppm / labelling.efficiency) %>%
+  select(-mutCode, -bg.minus.mut) %>%
+  distinct()
+
+k.bio.ppm.single <-
+  mut.single.ppm %>%
+  filter(time <= 30) %>%
+  group_by(arm.name, start.pos, experiment) %>%
+  do(fit = lm(mut.ppm.lab.norm ~ 0 + time, data = .)) %>% tidy(fit) %>%
+  ungroup() %>%
+  select(-term, -(std.error:p.value)) %>%
+  dplyr::rename(k.bio.ppm = estimate)
+
+mut.single.ppm.spread <-
+  mut.single.ppm %>%
+  ungroup() %>%
+  select(arm.name, start.pos, mir.type, experiment, average.ppm) %>%
+  distinct() %>%
+  mutate(experiment = paste0(str_replace_all(experiment, "-", "_"), ".ppm")) %>%
+  group_by(arm.name, start.pos) %>%
+  mutate(exp.ppm = mean(average.ppm)) %>%
+  ungroup() %>%
+  left_join(k.bio.ppm.single %>%
+              mutate(experiment = paste0(str_replace_all(experiment, "-", "_"), ".kbio")) %>%
+              spread(experiment, k.bio.ppm)) %>%
+  spread(experiment, average.ppm) %>%
+  arrange(mir.type, desc(exp.ppm))
