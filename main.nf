@@ -52,6 +52,13 @@ params.rlocation = "$HOME/R/nxtflow_libs/"
 nxtflow_libs=file(params.rlocation)
 nxtflow_libs.mkdirs()
 
+// Set default adapter
+if (!params.adapter) {
+  adapter = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
+} else {
+  adapter = params.adapter
+}
+
 // Logging
 log.info "==========================================="
 log.info " Ameres Lab sRNAseq pipeline v${version}"
@@ -62,6 +69,7 @@ log.info "Genome Annotation    : ${params.genomeAnno}"
 log.info "Genome Fasta         : ${params.genomeFasta}"
 log.info "Mismatches           : ${mismatches}"
 log.info "sRNA annotated reads : ${params.annoreads}"
+log.info "Adapter Sequence     : ${params.adapter}"
 log.info "Current user         : $USER"
 log.info "Current path         : $PWD"
 log.info "Script dir           : $baseDir"
@@ -91,10 +99,6 @@ if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
 }
 
 readcounts      = file(params.annoreads)
-
-if (!params.adapter) {
-  adapter = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
-}
 
 // We need to put a check in here, to set read counts to 10000000 or so.
 if (!readcounts.exists()) exit 1, "Read counts not provided."
