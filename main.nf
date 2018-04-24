@@ -71,7 +71,7 @@ if (!params.max) {
   maxlen = params.max
 }
 
-if (!params.randn) {
+if (!params.norand) {
   trim = true
 } else {
   trim = false
@@ -286,41 +286,37 @@ process trim_adapter {
 /*
  *  STEP 2: Trim 4-N from 5' and 3'-ends
  */
+if (trim) {
+  process trim_4N {
+    /*
+     * This relies on seqtk being installed! http://github.com/lh3/seqtk
+     * build requirements are only zlib, but cluster-env doesn't
+     * always provide this as separately loadable lib.
+     */
+    tag "$acReads"
 
-process trim_4N {
-  /*
-   * This relies on seqtk being installed! http://github.com/lh3/seqtk
-   * build requirements are only zlib, but cluster-env doesn't
-   * always provide this as separately loadable lib.
-   */
-  tag "$acReads"
+    input:
+    file acReads from adapterClipped
 
-  input:
-  file acReads from adapterClipped
+    output:
+    file "*.trimmed.fq.gz" into trimmedReads
 
-  output:
-  file "*.trimmed.fq.gz" into trimmedReads
+    script:
+    prefix = acReads.toString() - ".adapter_clipped.fq.gz"
+    """
+    seqtk trimfq -b 4 -e 4 $acReads > trimmedReads.fq
 
-  when:
-  trim == true
-
-  script:
-  prefix = acReads.toString() - ".adapter_clipped.fq.gz"
-  """
-  seqtk trimfq -b 4 -e 4 $acReads > trimmedReads.fq
-
-  gzip -c trimmedReads.fq > ${prefix}.trimmed.fq.gz
-  """
+    gzip -c trimmedReads.fq > ${prefix}.trimmed.fq.gz
+    """
+  }
+} else {
+  trimmedReads = adapterClipped
 }
 
 /*
  * STEP 3: Align
  */
 process bowtie_hairpins {
-  if (!trim) {
-    trimmedReads = adapterClipped
-  }
-
   tag "$trimmedReads"
 
   publishDir path: getOutDir('rawAlignments'), mode: "copy", pattern: '*.TCtagged_hairpin.bam'
