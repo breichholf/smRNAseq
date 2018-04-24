@@ -59,6 +59,25 @@ if (!params.adapter) {
   adapter = params.adapter
 }
 
+// Set default min/max lengths to trim down to
+if (!params.min) {
+  minlen = 26
+} else {
+  minlen = params.min
+}
+if (!params.max) {
+  maxlen = 38
+} else {
+  maxlen = params.max
+}
+
+if (!params.randn) {
+  trim = true
+} else {
+  trim = false
+}
+
+
 // Logging
 log.info "==========================================="
 log.info " Ameres Lab sRNAseq pipeline v${version}"
@@ -70,6 +89,7 @@ log.info "Genome Fasta         : ${params.genomeFasta}"
 log.info "Mismatches           : ${mismatches}"
 log.info "sRNA annotated reads : ${params.annoreads}"
 log.info "Adapter Sequence     : ${params.adapter}"
+log.info "Min / Max / Trim?    : $minlen / $maxlen / $trim"
 log.info "Current user         : $USER"
 log.info "Current path         : $PWD"
 log.info "Script dir           : $baseDir"
@@ -255,8 +275,8 @@ process trim_adapter {
   #  -a ${adapter} \
   #  - 2>> ${prefix}.trim_report.txt | gzip > ${prefix}.adapter_clipped.fq.gz
   cutadapt \
-    -m 26 \
-    -M 38 \
+    -m ${minlen} \
+    -M ${maxlen} \
     -a ${adapter} \
     -o ${prefix}.adapter_clipped.fq.gz \
     $reads > ${prefix}.trim_report.txt
@@ -281,6 +301,9 @@ process trim_4N {
   output:
   file "*.trimmed.fq.gz" into trimmedReads
 
+  when:
+  trim == true
+
   script:
   prefix = acReads.toString() - ".adapter_clipped.fq.gz"
   """
@@ -294,6 +317,10 @@ process trim_4N {
  * STEP 3: Align
  */
 process bowtie_hairpins {
+  if (!trim) {
+    trimmedReads = adapterClipped
+  }
+
   tag "$trimmedReads"
 
   publishDir path: getOutDir('rawAlignments'), mode: "copy", pattern: '*.TCtagged_hairpin.bam'
