@@ -324,7 +324,8 @@ top.mirstar.by.hl %>%
                  control = nls.lm.control(maxiter = 1000),
                  na.action = na.omit, data = .)) %>%
   tidy(fit) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(half.life = log(2) / estimate)
 
 # by HL:    -- Plat = 0.06442492  --  k = 0.03775720
 # by plat:  -- Plat = 0.06889482  --  k = 0.03300093
@@ -1140,3 +1141,5 @@ mut.single.ppm.spread <-
               spread(experiment, k.bio.ppm)) %>%
   spread(experiment, average.ppm) %>%
   arrange(mir.type, desc(exp.ppm))
+
+mut.single.ppm.spread %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/M3987 - Ago2KO 24h R1/raw/rep1_2_side-by-side.kbio.tsv')

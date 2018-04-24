@@ -92,6 +92,10 @@ if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
 
 readcounts      = file(params.annoreads)
 
+if (!params.adapter) {
+  adapter = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
+}
+
 // We need to put a check in here, to set read counts to 10000000 or so.
 if (!readcounts.exists()) exit 1, "Read counts not provided."
 
@@ -241,14 +245,15 @@ process trim_adapter {
   """
   # zcat $reads | paste -d '' - - - - > column.fq
   # Parallelism doesn't work just yet, joined adapter clipped file is not always grouped properly.
+  # Default adapter: AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG
   # parallel --pipepart --line-buffer --round-robin -j ${task.cpus} -a column.fq
   # tr '' '' | cutadapt -m 26 -M 38\
-  #  -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+  #  -a ${adapter} \
   #  - 2>> ${prefix}.trim_report.txt | gzip > ${prefix}.adapter_clipped.fq.gz
   cutadapt \
     -m 26 \
     -M 38 \
-    -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+    -a ${adapter} \
     -o ${prefix}.adapter_clipped.fq.gz \
     $reads > ${prefix}.trim_report.txt
   """

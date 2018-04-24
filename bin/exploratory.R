@@ -38,7 +38,9 @@ both.tc.min.info <-
 
 ggplot(both.tc.min.info %>% mutate(experiment = str_replace(experiment, "-", "_tcReadSum_")) %>%
          select(-timepoint, -time, -average.ppm, -avg.mut.based.ppm) %>% spread(experiment, tc.read.sum),
-       aes(log10(Ago2KO_tcReadSum_4h), log10(Ago2KO_tcReadSum_24h))) + geom_point(size = 4, alpha = 0.4)
+       aes(log10(Ago2KO_tcReadSum_4h), log10(Ago2KO_tcReadSum_24h))) +
+  geom_point(size = 4, alpha = 0.4) +
+  geom_smooth()
 
 ggplot(both.tc.min.info %>% mutate(experiment = str_replace(experiment, "-", "_mutBased_")) %>%
          select(-timepoint, -time, -average.ppm, -tc.read.sum) %>% spread(experiment, avg.mut.based.ppm),
