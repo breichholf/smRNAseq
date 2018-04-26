@@ -49,6 +49,7 @@ mirPosWFiles <-
   dplyr::filter(average.ppm >= 5, read.type == "totalReads") %>%
   dplyr::rename(totalReads = reads)
 
+# This is a bit hackey, as on our cluster, the nCores provided is half what R can use by hyperthreading
 nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 
@@ -64,6 +65,7 @@ mirsWmuts <-
 
 mirsWmuts %>% write_tsv('miRs.wAllMuts.tsv')
 
+# Determine mutation code and fraction of bases mutated
 mirMutCodes <-
   mirsWmuts %>%
   spread(nucleotide, count) %>%
@@ -78,6 +80,7 @@ mirMutCodes <-
   ungroup() %>%
   dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type)
 
+# Switch to wide format for smoother excel copy/paste
 mirMutsWide <-
   mirMutCodes %>%
   group_by(flybase_id, time, start.pos, mutCode) %>%

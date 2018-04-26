@@ -156,12 +156,14 @@ getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, .
                             list("seqLen" = width(bam[[1]]$seq)),
                             do.call(dplyr::bind_cols, bam[[1]]$tag))
 
+  # Sum up all reads with length X, to get total read count
   totalReadCounts <-
     map.r %>%
     group_by(rname, pos, seqLen) %>% summarise(lenDis = n()) %>%
     group_by(rname, pos) %>% mutate(totalReads = sum(lenDis)) %>% ungroup() %>%
     mutate(flybase_id = as.character(rname))
 
+  # Sum up all reads where the custom TC flag was found
   tcReadCounts <-
     map.r %>%
     dplyr::filter(!is.na(TC)) %>%
@@ -170,13 +172,15 @@ getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, .
     mutate(flybase_id = as.character(rname)) %>%
     dplyr::select(-rname)
 
+  # Join tc Read count in to total reads
   read.summary <-
     totalReadCounts %>%
     left_join(tcReadCounts, by = c("flybase_id", "pos", "seqLen")) %>%
     replace_na(list(totalReads = 0, lenDis = 0, tcReads = 0, tcLenDis = 0)) %>%
     left_join(mirAnno, by = "flybase_id") %>%
-    dplyr::select(-rname, -loop)
+    dplyr::select(-rname)
 
+  # Only keep reads that are within +/-10nt of the suggested 5p/3p arm positions
   read.summary.closestArms <-
     read.summary %>%
     dplyr::filter((pos >= `5p` - 10 & pos <= `5p` + 10) | (pos >= `3p` - 10 & pos <= `3p` + 10)) %>%
@@ -189,6 +193,7 @@ getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, .
   totalLDname <- paste("totalLenDis", id, time, sep = ".")
   tcLDname <- paste("tcLenDis", id, time, sep = ".")
 
+  # Keep the `topn` (default: 5) most frequently used start positions
   read.summary.topnPos <-
     read.summary.closestArms %>%
     group_by(arm.name) %>%
