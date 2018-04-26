@@ -179,8 +179,8 @@ getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, .
 
   read.summary.closestArms <-
     read.summary %>%
-    dplyr::filter((pos >= `5p` - 5 & pos <= `5p` + 5) | (pos >= `3p` - 5 & pos <= `3p` + 5)) %>%
-    mutate(arm.name = ifelse(pos >= `5p` - 5 & pos <= `5p` + 5,
+    dplyr::filter((pos >= `5p` - 10 & pos <= `5p` + 10) | (pos >= `3p` - 10 & pos <= `3p` + 10)) %>%
+    mutate(arm.name = ifelse(pos >= `5p` - 10 & pos <= `5p` + 10,
                              paste0(str_sub(mir_name, 5, -1), "-5p"),
                              paste0(str_sub(mir_name, 5, -1), "-3p")))
 
@@ -395,7 +395,7 @@ onlyTCReads <- function(flybase_id, pos, bamFile, timepoint, full.seq, minLen = 
                          filter = onlyTCandNoNs)
 }
 
-pileupParallelMuts <- function(groupedData, mc.param) {
+pileupParallelMuts <- function(groupedData, mc.param, minLen) {
   suppressMessages(require(BiocParallel))
   suppressMessages(require(dplyr))
 
@@ -407,7 +407,7 @@ pileupParallelMuts <- function(groupedData, mc.param) {
   mir.type <- groupedData$mir.type
 
   doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, time = t, pos = pos,
-                    mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = 18),
+                    mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = minLen),
                     SIMPLIFY = FALSE, BPPARAM = mc.param)
 
   return(dplyr::bind_rows(doOut))

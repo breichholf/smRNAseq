@@ -26,6 +26,8 @@ mirPositions <- read_tsv(posFile)
 preMirFasta <- readDNAStringSet(preMirFastaFile)
 preMirTbl <- as_tibble(list('flybase_id' = names(preMirFasta), 'full.seq' = paste(preMirFasta)))
 
+mirBodyLength <- 18
+
 # Get tidy format of reference nucleotides from preMirTbl
 maxHairpinLen <- max(str_length(preMirTbl$full.seq))
 
@@ -54,7 +56,7 @@ mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 mirsWmuts <-
   mirPosWFiles %>%
   group_by(bamFile) %>%
-  do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param)) %>%
+  do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param, minLen = mirBodyLength)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
   left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx')) %>%
