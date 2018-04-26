@@ -26,7 +26,7 @@ mirPositions <- read_tsv(posFile)
 preMirFasta <- readDNAStringSet(preMirFastaFile)
 preMirTbl <- as_tibble(list('flybase_id' = names(preMirFasta), 'full.seq' = paste(preMirFasta)))
 
-mirBodyLength <- 18
+mirBodyLength <- 30
 
 # Get tidy format of reference nucleotides from preMirTbl
 maxHairpinLen <- max(str_length(preMirTbl$full.seq))
