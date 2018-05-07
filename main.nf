@@ -131,70 +131,12 @@ Channel
   .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
   .set { rawReads }
 
-// Required for genomic alignment for hierarchical counting
-// process prepareGenome {
-//   input:
-//   file genome from genomeFasta
-//   file rRnaPrecursor from rRNA
-//   file assReport from assemblyReport
 
-//   output:
-//   file '*.fa' into riboMitoGenomeFa
-
-//   script:
-//   """
-//   # Change Fasta to tab separated format
-//   gunzip -c $genome | \\
-//     awk '/^>/&&NR>1{printf \"%s\", /^>/ ? \$0\" \":\$0}' | \\
-//     tr ' ' '\\t' > genome_fb-names.txt
-
-//   # Get flybase[tab]ucscNames
-//   awk '(\$0 !~ /^#/){printf \"%s\\t%s\", \$1 \$NF}' $assReport > nameConv.tsv
-
-//   # Write out ribosome, mitochondria and
-//   # exchange other names to ucscNames
-//   awk -v names=\"nameConv.tsv\" \\
-//       -v ribo=\"ribosome.txt\" \\
-//       -v mito=\"mito.fa\" \\
-//       'BEGIN{
-//           while((getline L < names) > 0) {
-//             if (\$NF ~ \"chrM\") nameArray[\"mitochondrion_genome\"] = \$2
-//             if (\$1 ~ \"rDNA\") nameArray[\"rDNA\"] = \"rDNA\"
-//             else nameArray[\$1] = \$2
-//           }
-//         }
-//         {
-//           if (\$1 ~ /mitochondrion/) printf \">%s\\n%s\", nameArray[\$1], \$2 >> ribo
-//           else if (\$1 ~ /rDNA/) printf \">%s\\n%s\", nameArray[\$1], \$2 >> mito
-//           else printf \">%s\\n%s\", nameArray[\$1], \$2
-//         }' > genome_noMito-noRibo_incl-Y.fa
-
-//   cat ribosome.txt $rRnaPrecursor > ribosome.fa
-//   """
-// }
-
-// Prepare annotations for hierarchical counting
-// process prepareAnnos {
-//   beforeScript 'installdeps.R'
-
-//   input:
-//   file gff from genomeAnno
-//   file nameConv from assemblyReport
-//   file rRNA
-
-//   output:
-//   file "fullGenomeAnno.bed" into genomeAnno
-
-//   script:
-//   """
-//   # Extract Flybase Annos
-//   prepareref.R -g $gff -n $nameConv -o flybase.bed
-
-//   # Add rRNA Annotation
-
-//   """
-// }
-
+/*
+ *  STEP 1a - Preprocess reference: Extract hairpin loci from genome
+ *  Required: GTF file with hairpins. Formatting and naming scheme widely divergent
+ *            in different species, currently only works with fly.
+ */
 process extractHairpins {
   tag "genomePrep"
   publishDir path: getOutDir('ref'), mode: "copy", pattern: 'hairpin*.{fa,bed}'
@@ -236,6 +178,9 @@ process extractHairpins {
   """
 }
 
+/*
+ *  STEP 1b - Preprocess reference: Make index
+ */
 process makeIndex {
   tag "Hairpins"
 
@@ -252,7 +197,11 @@ process makeIndex {
   """
 }
 
-// Clip 3' Adapter using cutadapt
+/*
+ *  STEP 2a - Preprocess reads: Clip 3' adapter
+ *  Note: Default adapter sequence is identical to Illumina adapter, custom sequence can be supplied.
+ *  Default sequence: `AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG`
+ */
 process trim_adapter {
   tag "$reads"
   publishDir path: getOutDir('reports'), mode: "copy", pattern: '*.trim_report.txt'
@@ -284,13 +233,13 @@ process trim_adapter {
 }
 
 /*
- *  STEP 2: Trim 4-N from 5' and 3'-ends
+ *  STEP 2b - Preprocess reads: Trim random N from 5' and 3' end
+ *  Note: if parameter --norand is passed, trimming will be skipped entirel.
  */
 process trim_4N {
   /*
    * This relies on seqtk being installed! http://github.com/lh3/seqtk
-   * build requirements are only zlib, but cluster-env doesn't
-   * always provide this as separately loadable lib.
+   * build requirements are only zlib
    */
   tag "$acReads"
 
@@ -316,6 +265,7 @@ process trim_4N {
 
 /*
  * STEP 3: Align
+ * Note: We use bowtie v1.2.2, but likely any aligner could be used
  */
 process bowtie_hairpins {
   tag "$trimmedReads"
@@ -377,7 +327,7 @@ process post_alignment {
 }
 
 /*
- *  STEP 5a: Postprocessing -- Prepare JSON configuration
+ *  STEP 5a - Postprocessing -- Prepare JSON configuration
  */
 
 process writeJson {
@@ -445,14 +395,21 @@ process writeJson {
 }
 
 /*
- *  STEP 5b: Postprocessing -- Getting alignment statistics for miR hairpin mappers
- *                             1) Count all reads and T>C reads with T>C BQ>27
- *                             2) Length-specific background subtraction for TC reads
- *                             3) Separate miR and miR-STAR bg-subtracted T>C reads
- *                             4) Prepare raw data for scissor plots
- *                                - Default norm to 3h (180 minutes) for comparison
- *                                  between replicates
- *                             5) Prepare length distribution data for nibbler plots
+ *  STEP 5b - Postprocessing -- Getting alignment statistics for miR hairpin mappers
+ *                              1) Count all reads and T>C reads with T>C BQ>27
+ *                              2) Get average reads across all samples
+ *                              3) Summarise reads per length isoform, and total Reads
+ *                              4) Save unfiltered information to `allCounts.tsv`
+ *                              5) Keep wide (untidy) tbl with abundance of length isoforms
+ *                                 as well as total lengths
+ *                              6) Only keep (top 5 most abundant) isoforms that are represented
+ *                                 across all datasets
+ *                                 `filteredPositions.tsv` -> steady state
+ *                                 `filteredLenDis.tsv`    -> length isoforms
+ *                              7) Add metadata (seed, UCount, arm type, arm name)
+ *  Currently NOT done (anymore):
+ *                              -) Any type of filtering
+ *                              -) Processing data as 'ready to plot'
  */
 
 process alignmentStats {
@@ -475,8 +432,9 @@ process alignmentStats {
 }
 
 /*
- *  STEP 5c: Postprocessing -- Process BAM files in parallel using BiocParallel
- *                             -> Assess all mutations for miRs >0 ppm at all timepoints
+ *  STEP 5c - Postprocessing -- Process BAM files in parallel using BiocParallel
+ *                              -) Get mutations for all positions in a miR, for all miRNAs
+ *                                 provided in `filteredPositions.tsv`
  */
 process mutationStats {
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
@@ -500,4 +458,3 @@ process mutationStats {
   getMutStats.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
   """
 }
-
