@@ -1,4 +1,4 @@
-# smRNAseq
+# smRNAseq - reporting mutations across the most abundant miRNA species
 
 Inspired by SciLifeLab/NGI-smRNAseq.
 
