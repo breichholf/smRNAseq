@@ -121,6 +121,8 @@ doOut <- bpmapply(doAllMuts, miR = fbid, timepoint = tp, pos = pos, maxLen = mL,
 nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 
+print(mc.param)
+
 mirsWmuts <-
   topPosWlens %>%
   left_join(distinctFiles) %>%
