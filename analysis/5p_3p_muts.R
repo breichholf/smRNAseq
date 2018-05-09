@@ -101,9 +101,9 @@ mirPosWFiles <-
 topPosWlens <-
   mirPosWFiles %>%
   filter(LD.type == "totalLenDis") %>%
-  gropu_by(arm.name, pos, timepoint) %>%
+  group_by(arm.name, pos, timepoint) %>%
   top_n(1, reads) %>%
-  gropu_by(flybase_id, arm.name, pos, seqLen) %>%
+  group_by(flybase_id, arm.name, pos, seqLen) %>%
   summarise(counter = n()) %>%
   group_by(arm.name, pos) %>%
   filter(counter == max(counter), counter > 1)
