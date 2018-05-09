@@ -47,7 +47,7 @@ doAllMuts <- function(miR, timepoint, pos, maxLen, bamFile) {
   filterBam <- filterBam(bamFile, tempfile(),
                          param = ScanBamParam(what = "seq",
                                               flag = scanBamFlag(isMinusStrand = F)),
-                         filter = filterNs)
+                         filter = filterNsMaxLen)
   
   pileupResult <- pileup(filterBam, scanBamParam = sparam, pileupParam = pparam)
   
