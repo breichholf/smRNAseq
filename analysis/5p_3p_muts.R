@@ -123,6 +123,6 @@ mirsWmuts <-
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
   left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx')) %>%
-  left_join(mirPosWFiles %>% dplyr::select(-bamFile), by = c('flybase_id', 'timepoint', 'time', 'mir.type', 'start.pos' = 'pos'))
+  left_join(mirPosWFiles %>% dplyr::select(-bamFile), by = c('flybase_id', 'timepoint', 'start.pos' = 'pos'))
 
 mirsWmuts %>% write_tsv('miRs.entireLenMuts.tsv')
