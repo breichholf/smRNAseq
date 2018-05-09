@@ -23,9 +23,7 @@ pileupAllMuts <- function(groupedData, mc.param) {
   pos <- groupedData$pos
   mL <- groupedData$seqLen
   
-  doOut <- bpmapply(doAllMuts, miR = fbid, timepoint = tp, pos = pos, maxLen = mL,
-                    MoreArgs = list(bamFile = bF), SIMPLIFY = FALSE,
-                    BPPARAM = mc.param)
+  doOut <- bpmapply(doAllMuts, miR = fbid, timepoint = tp, pos = pos, maxLen = mL, MoreArgs = list(bamFile = bF), SIMPLIFY = FALSE, BPPARAM = mc.param)
   
   return(dplyr::bind_rows(doOut))
 }
@@ -113,15 +111,9 @@ distinctFiles <-
   select(flybase_id, arm.name, pos, bamFile, timepoint) %>%
   distinct()
 
-doOut <- bpmapply(doAllMuts, miR = fbid, timepoint = tp, pos = pos, maxLen = mL,
-                  MoreArgs = list(bamFile = bF), SIMPLIFY = FALSE,
-                  BPPARAM = mc.param)
-
 # This is a bit hackey, as on our cluster, the nCores provided is half what R can use by hyperthreading
 nProcs <- nCores * 2
 mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
-
-print(mc.param)
 
 mirsWmuts <-
   topPosWlens %>%
