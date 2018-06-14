@@ -52,30 +52,19 @@ params.rlocation = "$HOME/R/nxtflow_libs/"
 nxtflow_libs=file(params.rlocation)
 nxtflow_libs.mkdirs()
 
-// Set default adapter
-if (!params.adapter) {
-  adapter = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
-} else {
-  adapter = params.adapter
-}
+// Adapter initialising
+params.adapter = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG"
+adapter = params.adapter
 
 // Set default min/max lengths to trim down to
-if (!params.min) {
-  minlen = 26
-} else {
-  minlen = params.min
-}
-if (!params.max) {
-  maxlen = 38
-} else {
-  maxlen = params.max
-}
+params.min = 26
+params.max = 38
+minlen = params.min
+maxlen = params.max
 
-if (!params.norand) {
-  trim = true
-} else {
-  trim = false
-}
+// --notrim to prevent trimming
+params.notrim = false
+notrim = params.notrim
 
 
 // Logging
@@ -251,7 +240,7 @@ process trim_4N {
 
   script:
   prefix = acReads.toString() - ".adapter_clipped.fq.gz"
-  if (trim) {
+  if (!notrim) {
     """
     seqtk trimfq -b 4 -e 4 $acReads > trimmedReads.fq
     gzip -c trimmedReads.fq > ${prefix}.trimmed.fq.gz
