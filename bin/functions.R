@@ -1,11 +1,14 @@
 setupRlibs <- function(R_lib, ...){
   .libPaths( c( .libPaths(), R_lib ) )
 
-  load_packs <- quos(...)
-
   if(!require("pacman")) {
     install.packages("pacman", dependencies = TRUE, repos = 'http://cloud.r-project.org/')
   }
+
+  p_load(rlang)
+  
+  load_packs <- quos(...)
+
 
   p_install_version(
     c('tidyverse', 'cowplot', 'Biostrings', 'Rsamtools', 'BiocParallel', 'jsonlite'),
