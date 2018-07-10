@@ -259,8 +259,6 @@ process trim_4N {
 process bowtie_hairpins {
   tag "$trimmedReads"
 
-  publishDir path: getOutDir('rawAlignments'), mode: "copy", pattern: '*.TCtagged_hairpin.bam'
-
   input:
   file trimmedReads
   file index from hairpinIndex
@@ -295,7 +293,6 @@ def wrap_hairpin = { file ->
 
 process post_alignment {
   tag "$hairpinAligned"
-
   publishDir path: getOutDir('sortedAlignment'), mode: "copy", saveAs: wrap_hairpin
 
   input:
