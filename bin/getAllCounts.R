@@ -9,11 +9,7 @@ preMirFastaFile <- as.character(args[4])
 
 source(file.path(scriptDir, "bin/functions.R"))
 
-setupRlibs(R_libs)
-
-library(tidyverse)
-library(Biostrings)
-library(purrr)
+setupRlibs(R_libs, jsonlite, tidyverse, Biostrings)
 
 sessionInfo()
 

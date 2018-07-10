@@ -1,53 +1,67 @@
-setupRlibs <- function(R_lib){
-
+setupRlibs <- function(R_lib, ...){
   .libPaths( c( .libPaths(), R_lib ) )
 
-  if (!require("Biostrings")){
-    source("http://bioconductor.org/biocLite.R")
-    biocLite("Biostrings", suppressUpdates=TRUE)
+  load_packs <- quos(...)
+
+  if(!require("pacman")) {
+    install.packages("pacman", dependencies = TRUE, repos = 'http://cloud.r-project.org/')
   }
 
-  if (!require("Rsamtools")){
-    source("http://bioconductor.org/biocLite.R")
-    biocLite("Rsamtools", suppressUpdates=TRUE)
-  }
+  p_install_version(
+    c('tidyverse', 'cowplot', 'Biostrings', 'Rsamtools', 'BiocParallel', 'jsonlite'),
+    c('1.2.1', '0.9.2', '2.44.2', '1.28.0', '1.10.1', '1.5')
+  )
 
-  if (!require("BiocParallel")){
-    source("http://bioconductor.org/biocLite.R")
-    biocLite("BiocParallel", suppressUpdates=TRUE)
-  }
+  pacman::p_load(!!! load_packs)
 
-  if (!require("stringr")){
-    install.packages("stringr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # Install minimal versions of:
+  # stringr, forcats, purrr, readr, tibble, tidyr, cowplot, knitr, dplyr, ggplot, tidyverse
+  # if (!require("Biostrings")){
+  #   source("http://bioconductor.org/biocLite.R")
+  #   biocLite("Biostrings", suppressUpdates=TRUE)
+  # }
 
-  if (!require("forcats")){
-    install.packages("forcats", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("Rsamtools")){
+  #   source("http://bioconductor.org/biocLite.R")
+  #   biocLite("Rsamtools", suppressUpdates=TRUE)
+  # }
 
-  if (!require("purrr")){
-    install.packages("purrr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("BiocParallel")){
+  #   source("http://bioconductor.org/biocLite.R")
+  #   biocLite("BiocParallel", suppressUpdates=TRUE)
+  # }
 
-  if (!require("readr")){
-    install.packages("readr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("stringr")){
+  #   install.packages("stringr", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
 
-  if (!require("tibble")) {
-    install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("forcats")){
+  #   install.packages("forcats", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
 
-  if (!require("tidyr")) {
-    install.packages("tidyr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("purrr")){
+  #   install.packages("purrr", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
 
-  if (!require("cowplot")) {
-    install.packages("cowplot", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("readr")){
+  #   install.packages("readr", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
 
-  if (!require("knitr")) {
-    install.packages("knitr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  }
+  # if (!require("tibble")) {
+  #   install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
+
+  # if (!require("tidyr")) {
+  #   install.packages("tidyr", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
+
+  # if (!require("cowplot")) {
+  #   install.packages("cowplot", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
+
+  # if (!require("knitr")) {
+  #   install.packages("knitr", dependencies=TRUE, repos='http://cloud.r-project.org/')
+  # }
 
   # if (!require("optparse")) {
   #   install.packages("optparse", dependencies=TRUE, repos='http://cloud.r-project.org/')
