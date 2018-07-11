@@ -1,4 +1,4 @@
-setupRlibs <- function(R_lib, ...){
+setupRlibs <- function(R_lib){
   .libPaths( c( .libPaths(), R_lib ) )
 
   if(!require("pacman")) {
@@ -6,16 +6,14 @@ setupRlibs <- function(R_lib, ...){
   }
 
   p_load(rlang)
-  
-  load_packs <- quos(...)
 
 
   p_install_version(
-    c('tidyverse', 'cowplot', 'Biostrings', 'Rsamtools', 'BiocParallel', 'jsonlite'),
-    c('1.2.1', '0.9.2', '2.44.2', '1.28.0', '1.10.1', '1.5')
+    c('rlang', 'tidyverse', 'cowplot', 'Biostrings', 'Rsamtools', 'BiocParallel', 'jsonlite'),
+    c('0.2.1', '1.2.1', '0.9.2', '2.44.2', '1.28.0', '1.10.1', '1.5')
   )
 
-  pacman::p_load(!!! load_packs)
+  pacman::p_load(rlang, tidyverse, cowplot, Biostrings, Rsamtools, BiocParallel, jsonlite)
 
   # Install minimal versions of:
   # stringr, forcats, purrr, readr, tibble, tidyr, cowplot, knitr, dplyr, ggplot, tidyverse
