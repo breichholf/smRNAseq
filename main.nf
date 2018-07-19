@@ -136,10 +136,10 @@ process extrIndexNcRNA {
 
   input:
   file rdna
-  file virusGenomes
+  //file virusGenomes
 
   output:
-  file "virus_idx" into viruses
+  //file "virus_idx*" into viruses
   file "ribo_idx*" into ribosomes
   file "tRNA_idx*" into trnas
   file "snRNA_idx*" into sn
@@ -147,9 +147,9 @@ process extrIndexNcRNA {
 
   script:
   """
-  echo "Building Virus index"
-  samtools faidx $virusGenomes
-  bowtie-build $virusGenomes virus_idx
+  # echo "Building Virus index"
+  # samtools faidx $virusGenomes
+  # bowtie-build $virusGenomes virus_idx
 
   echo "Extracting ribosomal, tRNA, snRNA and snoRNA sequences"
   fetch_ncRNA_fastas.R $baseDir ${params.rlocation}
@@ -297,7 +297,7 @@ process stepWiseAlign {
 
   input:
   file trimmedReads
-  file vIDX from viruses
+  //file vIDX from viruses
   file riboIDX from ribosomes
   file tIDX from trnas
   file snIDX from sn
