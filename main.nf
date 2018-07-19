@@ -213,7 +213,6 @@ process stepWiseAlign {
 
   samtools sort ncRNA_unsorted.bam -o ${prefix}.ncRNA_sorted.bam
   """
-  }
 }
 
 /*
