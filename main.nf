@@ -308,16 +308,20 @@ process stepWiseAlign {
 
   script:
   prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
+  rIDX_base = riboIDX.toString().tokenize(' ')[0].tokenize('.')[0]
+  tIDX_base = tIDX.toString().tokenize(' ')[0].tokenize('.')[0]
+  snIDX_base = snIDX.toString().tokenize(' ')[0].tokenize('.')[0]
+  snoIDX_base = snoIDX.toString().tokenize(' ')[0].tokenize('.')[0]
   cleanMisMatch = 3
   // prefix = reads.toString() - ".virusCleaned.fq.gz"
   // \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
   """
   alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
 
-  \$alignCmd $riboIDX -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
-  \$alignCmd $tIDX -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
-  \$alignCmd $snIDX -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
-  \$alignCmd $snoIDX -q <(zcat snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
+  \$alignCmd $rIDX_base -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
+  \$alignCmd $tIDX_base -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
+  \$alignCmd $snIDX_base -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
+  \$alignCmd $snoIDX_base -q <(zcat snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
 
   # samples="virus ribo tRNA snRNA snoRNA"
   for sam in \$samples; do
