@@ -318,10 +318,10 @@ process stepWiseAlign {
   """
   alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
 
-  \$alignCmd $rIDX_base -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
-  \$alignCmd $tIDX_base -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
-  \$alignCmd $snIDX_base -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
-  \$alignCmd $snoIDX_base -q <(zcat snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
+  \$alignCmd $rIDX_base -q <(zcat -f $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
+  \$alignCmd $tIDX_base -q <(zcat -f riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
+  \$alignCmd $snIDX_base -q <(zcat -f tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
+  \$alignCmd $snoIDX_base -q <(zcat -f snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
 
   # samples="virus ribo tRNA snRNA snoRNA"
   for sam in \$samples; do
@@ -363,7 +363,7 @@ process bowtie_hairpins {
   """
   echo "${goodReads}" >> postBowtie.log
   bowtie -a --best --strata -v $mismatches -S -p ${task.cpus} \
-    $index_base -q <(zcat $goodReads) | \
+    $index_base -q <(zcat -f $goodReads) | \
     arrayTagTCreads.awk | \
     samtools view -bS - > ${prefix}.TCtagged_hairpin.bam
   """
