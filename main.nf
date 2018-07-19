@@ -73,37 +73,7 @@ genomeAnno      = params.genomeAnno ? file(params.genomeAnno) : null
 mirArmAnno      = params.mirArmAnno ? file(params.mirArmAnno) : null
 virusGenomes    = params.virusGenomes ? file(params.virusGenomes) : null
 rdna            = params.rdna ? file(params.rdna) : null
-readcounts      = file(params.annoreads)
-
-if( !params.genomeFasta || !genomeFastaFile.exists() ) {
-   exit 1, "Genome Fasta file not found: ${params.genomeFasta}. Please download from flybase."
-}
-if ( !params.genomeAnno || !genomeAnno.exists() ) {
-  exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
-}
-if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
-  exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
-}
-if ( !params.rdna || !rdna.exists() ) {
-  exit 1, "rRNA precursor file ${params.rdna} not found. Please download Genbank ID: M21017.1"
-}
-// Not yet in use
-// if ( !params.virusGenomes || !virusGenomes.exists() ) {
-//   exit 1, "Virus annotation file ${params.virusGenomes} not found. Please check."
-// }
-
-// TODO: Put a check in here, to set read counts to 10000000, for default normalisation.
-if (!readcounts.exists()) {
-  exit 1, "Read counts not provided."
-}
-
-/* This allows passing wild card tagged files on CLI:
- * `--reads <file*.x>`
- */
-Channel
-  .fromPath( params.reads )
-  .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
-  .set { rawReads }
+readcounts      = params.annoreads ? file(params.annoreads) : null
 
 // Logging
 log.info "==================================================="
@@ -124,6 +94,36 @@ log.info "R location           : ${params.rlocation}"
 log.info "Output dir           : ${params.outdir}"
 log.info "Config Profile       : ${workflow.profile}"
 log.info "==========================================="
+
+if( !params.genomeFasta || !genomeFastaFile.exists() ) {
+   exit 1, "Genome Fasta file not found: ${params.genomeFasta}. Please download from flybase."
+}
+if ( !params.genomeAnno || !genomeAnno.exists() ) {
+  exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
+}
+if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
+  exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
+}
+if ( !params.rdna || !rdna.exists() ) {
+  exit 1, "rRNA precursor file ${params.rdna} not found. Please download Genbank ID: M21017.1"
+}
+// Not yet in use
+// if ( !params.virusGenomes || !virusGenomes.exists() ) {
+//   exit 1, "Virus annotation file ${params.virusGenomes} not found. Please check."
+// }
+
+// TODO: Put a check in here, to set read counts to 10000000, for default normalisation.
+if ( !params.annoreads || !readcounts.exists() ) {
+  exit 1, "Read counts not provided."
+}
+
+/* This allows passing wild card tagged files on CLI:
+ * `--reads <file*.x>`
+ */
+Channel
+  .fromPath( params.reads )
+  .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
+  .set { rawReads }
 
 
 /*
