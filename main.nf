@@ -165,57 +165,6 @@ process extrIndexNcRNA {
 }
 
 /*
- *  STEP 0b - Stepwise align: 1) Viruses (if found) 2) Ribo 2) tRNA 3) snRNA 4) snoRNA
- */
-process stepWiseAlign {
-  tag "ncRNA-align: $trimmedReads"
-  publishDir path: getOutDir('ncRNA'), mode: "copy", pattern: '*.ncRNA_sorted.bam'
-
-  input:
-  file trimmedReads
-  file vIDX from viruses
-  file riboIDX from ribosomes
-  file tIDX from trnas
-  file snIDX from sn
-  file snoIDX from sno
-
-  output:
-  file "*.unalClean.fq" into goodReads
-
-  script:
-  prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
-  cleanMisMatch = 3
-  // prefix = reads.toString() - ".virusCleaned.fq.gz"
-  """
-  alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
-
-  # \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
-  \$alignCmd $riboIDX -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
-  \$alignCmd $tIDX -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
-  \$alignCmd $snIDX -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
-  \$alignCmd $snoIDX -q <(zcat snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
-
-  # samples="virus ribo tRNA snRNA snoRNA"
-  for sam in \$samples; do
-    samtools view -H TCtag_\${sam}.sam | awk '{
-      if(\$1 ~ /^@SQ/) { print \$0 > \${sam}_sq.txt }
-      if(\$1 ~ /^@PG/) { print \$0" sample: ${prefix}" > \${sam}_pg.txt }
-    }'
-    samtools view -F 4 TCtag_\${sam}.sam >> ncRNA.sam
-  done
-
-  # insert virus_sq and virus_pg
-  cat ribo_sq.txt tRNA_sq.txt snRNA_sq.txt snoRNA_sq.txt > ncRNA_sq.txt
-  cat ribo_pg.txt tRNA_pg.txt snRNA_pg.txt snoRNA_pg.txt > ncRNA_pg.txt
-
-  cat ncRNA_sq.txt ncRNA_pg.txt ncRNA.sam | \
-    samtools view -bS - > ncRNA_unsorted.bam
-
-  samtools sort ncRNA_unsorted.bam -o ${prefix}.ncRNA_sorted.bam
-  """
-}
-
-/*
  *  STEP 1a - Preprocess reference: Extract hairpin loci from genome
  *  Required: GTF file with hairpins. Formatting and naming scheme widely divergent
  *            in different species, currently only works with fly.
@@ -340,6 +289,57 @@ process trim_4N {
 }
 
 /*
+ *  STEP 3.0b - Stepwise align: 1) Viruses (if found) 2) Ribo 2) tRNA 3) snRNA 4) snoRNA
+ */
+process stepWiseAlign {
+  tag "ncRNA-align: $trimmedReads"
+  publishDir path: getOutDir('ncRNA'), mode: "copy", pattern: '*.ncRNA_sorted.bam'
+
+  input:
+  file trimmedReads
+  file vIDX from viruses
+  file riboIDX from ribosomes
+  file tIDX from trnas
+  file snIDX from sn
+  file snoIDX from sno
+
+  output:
+  file "*.unalClean.fq" into goodReads
+
+  script:
+  prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
+  cleanMisMatch = 3
+  // prefix = reads.toString() - ".virusCleaned.fq.gz"
+  """
+  alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
+
+  # \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
+  \$alignCmd $riboIDX -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
+  \$alignCmd $tIDX -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
+  \$alignCmd $snIDX -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
+  \$alignCmd $snoIDX -q <(zcat snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
+
+  # samples="virus ribo tRNA snRNA snoRNA"
+  for sam in \$samples; do
+    samtools view -H TCtag_\${sam}.sam | awk '{
+      if(\$1 ~ /^@SQ/) { print \$0 > \${sam}_sq.txt }
+      if(\$1 ~ /^@PG/) { print \$0" sample: ${prefix}" > \${sam}_pg.txt }
+    }'
+    samtools view -F 4 TCtag_\${sam}.sam >> ncRNA.sam
+  done
+
+  # insert virus_sq and virus_pg
+  cat ribo_sq.txt tRNA_sq.txt snRNA_sq.txt snoRNA_sq.txt > ncRNA_sq.txt
+  cat ribo_pg.txt tRNA_pg.txt snRNA_pg.txt snoRNA_pg.txt > ncRNA_pg.txt
+
+  cat ncRNA_sq.txt ncRNA_pg.txt ncRNA.sam | \
+    samtools view -bS - > ncRNA_unsorted.bam
+
+  samtools sort ncRNA_unsorted.bam -o ${prefix}.ncRNA_sorted.bam
+  """
+}
+
+/*
  * STEP 3: Align
  * Note: We use bowtie v1.2.2, but likely any aligner could be used
  */
@@ -355,9 +355,9 @@ process bowtie_hairpins {
 
   script:
   index_base = index.toString().tokenize(' ')[0].tokenize('.')[0]
-  prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
+  prefix = goodReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   """
-  echo "${trimmedReads}" >> postBowtie.log
+  echo "${goodReads}" >> postBowtie.log
   bowtie -a --best --strata -v $mismatches -S -p ${task.cpus} \
     $index_base -q <(zcat $goodReads) | \
     arrayTagTCreads.awk | \
