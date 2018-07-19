@@ -297,7 +297,7 @@ process stepWiseAlign {
 
   input:
   file trimmedReads
-  //file vIDX from viruses
+  // file vIDX from viruses
   file riboIDX from ribosomes
   file tIDX from trnas
   file snIDX from sn
@@ -310,10 +310,10 @@ process stepWiseAlign {
   prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   cleanMisMatch = 3
   // prefix = reads.toString() - ".virusCleaned.fq.gz"
+  // \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
   """
   alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
 
-  # \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
   \$alignCmd $riboIDX -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
   \$alignCmd $tIDX -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
   \$alignCmd $snIDX -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
