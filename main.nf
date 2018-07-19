@@ -75,26 +75,6 @@ virusGenomes    = params.virusGenomes ? file(params.virusGenomes) : null
 rdna            = params.rdna ? file(params.rdna) : null
 readcounts      = params.annoreads ? file(params.annoreads) : null
 
-// Logging
-log.info "==================================================="
-log.info "  Ameres Lab miRNA SLAMseq best practice v${version}"
-log.info "==================================================="
-log.info "Reads                : ${params.reads}"
-if (params.genome) log.info "Genome               : ${params.genome}"
-log.info "Genome Annotation    : ${params.genomeAnno}"
-log.info "Genome Fasta         : ${params.genomeFasta}"
-log.info "Mismatches           : ${mismatches}"
-log.info "sRNA annotated reads : ${params.annoreads}"
-log.info "Adapter Sequence     : ${params.adapter}"
-log.info "Min / Max / Trim?    : $minlen / $maxlen / $notrim"
-log.info "Current user         : $USER"
-log.info "Current path         : $PWD"
-log.info "Script dir           : $baseDir"
-log.info "R location           : ${params.rlocation}"
-log.info "Output dir           : ${params.outdir}"
-log.info "Config Profile       : ${workflow.profile}"
-log.info "==========================================="
-
 if( !params.genomeFasta || !genomeFastaFile.exists() ) {
    exit 1, "Genome Fasta file not found: ${params.genomeFasta}. Please download from flybase."
 }
@@ -124,6 +104,26 @@ Channel
   .fromPath( params.reads )
   .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
   .set { rawReads }
+
+// Logging
+log.info "==================================================="
+log.info "  Ameres Lab miRNA SLAMseq best practice v${version}"
+log.info "==================================================="
+log.info "Reads                : ${params.reads}"
+if (params.genome) log.info "Genome               : ${params.genome}"
+log.info "Genome Annotation    : ${params.genomeAnno}"
+log.info "Genome Fasta         : ${params.genomeFasta}"
+log.info "Mismatches           : ${mismatches}"
+log.info "sRNA annotated reads : ${params.annoreads}"
+log.info "Adapter Sequence     : ${params.adapter}"
+log.info "Min / Max / Trim?    : $minlen / $maxlen / $notrim"
+log.info "Current user         : $USER"
+log.info "Current path         : $PWD"
+log.info "Script dir           : $baseDir"
+log.info "R location           : ${params.rlocation}"
+log.info "Output dir           : ${params.outdir}"
+log.info "Config Profile       : ${workflow.profile}"
+log.info "==========================================="
 
 
 /*
