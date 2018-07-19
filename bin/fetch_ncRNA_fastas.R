@@ -11,7 +11,7 @@ setupRlibs(R_libs)
 pacman::p_load(biomaRt, seqinr, tidyverse)
 sessioninfo::session_info()
 
-ensembl <- useMart("ensembl", dataset = "dmelanogaster_gene_ensembl")
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "dmelanogaster_gene_ensembl")
 
 lookupTypes <- c('tRNA', 'rRNA', 'snoRNA', 'snRNA')
 
