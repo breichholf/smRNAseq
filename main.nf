@@ -30,7 +30,7 @@ String getOutDir(output_type) {
 
 // Configurable variables -- default values
 params.genome = false
-// params.mismatches = 3
+params.mismatches = 3
 
 // if params.mismatches is null, assign 3, otherwise assign mismatches
 mismatches           = params.mismatches ?: 3
