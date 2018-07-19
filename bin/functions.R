@@ -8,7 +8,7 @@ setupRlibs <- function(R_lib){
   p_load(rlang)
 
   p_install_version(
-    c('rlang', 'tidyverse', 'cowplot', 'jsonlite', 'devtools', 'seqinr', 'sessioninfo'
+    c('rlang', 'tidyverse', 'cowplot', 'jsonlite', 'devtools', 'seqinr', 'sessioninfo',
       'biomaRt', 'Biostrings', 'Rsamtools', 'BiocParallel'),
     c('0.2.1', '1.2.1', '0.9.2', '1.5', '1.13.6', '3.4-5', '1.0.0',
       '2.36.1', '2.44.2', '1.28.0', '1.10.1')
