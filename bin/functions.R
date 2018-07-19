@@ -7,68 +7,14 @@ setupRlibs <- function(R_lib){
 
   p_load(rlang)
 
-
   p_install_version(
-    c('rlang', 'tidyverse', 'cowplot', 'Biostrings', 'Rsamtools', 'BiocParallel', 'jsonlite'),
-    c('0.2.1', '1.2.1', '0.9.2', '2.44.2', '1.28.0', '1.10.1', '1.5')
+    c('rlang', 'tidyverse', 'cowplot', 'jsonlite', 'devtools', 'seqinr', 'sessioninfo'
+      'biomaRt', 'Biostrings', 'Rsamtools', 'BiocParallel'),
+    c('0.2.1', '1.2.1', '0.9.2', '1.5', '1.13.6', '3.4-5', '1.0.0',
+      '2.36.1', '2.44.2', '1.28.0', '1.10.1')
   )
 
-  pacman::p_load(rlang, tidyverse, cowplot, Biostrings, Rsamtools, BiocParallel, jsonlite)
-
-  # Install minimal versions of:
-  # stringr, forcats, purrr, readr, tibble, tidyr, cowplot, knitr, dplyr, ggplot, tidyverse
-  # if (!require("Biostrings")){
-  #   source("http://bioconductor.org/biocLite.R")
-  #   biocLite("Biostrings", suppressUpdates=TRUE)
-  # }
-
-  # if (!require("Rsamtools")){
-  #   source("http://bioconductor.org/biocLite.R")
-  #   biocLite("Rsamtools", suppressUpdates=TRUE)
-  # }
-
-  # if (!require("BiocParallel")){
-  #   source("http://bioconductor.org/biocLite.R")
-  #   biocLite("BiocParallel", suppressUpdates=TRUE)
-  # }
-
-  # if (!require("stringr")){
-  #   install.packages("stringr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("forcats")){
-  #   install.packages("forcats", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("purrr")){
-  #   install.packages("purrr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("readr")){
-  #   install.packages("readr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("tibble")) {
-  #   install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("tidyr")) {
-  #   install.packages("tidyr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("cowplot")) {
-  #   install.packages("cowplot", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("knitr")) {
-  #   install.packages("knitr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("optparse")) {
-  #   install.packages("optparse", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  #   library("optparse")
-  # }
-
+  p_load(sessioninfo)
 }
 
 getcfg <- function(json) {

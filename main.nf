@@ -16,7 +16,8 @@
  *        - Demultiplexing
  */
 
-version = "0.7.0"
+author  = "Brian Reichholf"
+version = "0.7.9"
 
 /*
  * Helper functions
@@ -29,23 +30,20 @@ String getOutDir(output_type) {
 
 // Configurable variables -- default values
 params.genome = false
-params.mismatches = 3
+// params.mismatches = 3
+
+// if params.mismatches is null, assign 3, otherwise assign mismatches
+mismatches           = params.mismatches ?: 3
+
 // Get genome files depending on --genome matched in impimba.config, if the genome is found and set on CLI.
 params.genomeFasta   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.genomeAnno    = params.genome ? params.genomes[ params.genome ].genomeAnno ?: false : false
 params.mirArmAnno    = params.genome ? params.genomes[ params.genome ].mirArmAnno ?: false : false
-params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
+params.virusGenomes  = params.genome ? params.genomes[ params.genome ].viruses ?: false : false
 params.rdna          = params.genome ? params.genomes[ params.genome ].ribosome ?: false : false
-params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
-params.saveReference = false
-params.name          = "miRNA-Seq Best practice"
-// if params.mismatches is null, assign 3, otherwise assign mismatches
-mismatches           = params.mismatches ?: 3
-
-// Check that we have a hairpin and wholeGenome reference Fasta!
-if( !params.genomeAnno ){
-    exit 1, "Missing hairpin reference indexes! Is --genome specified?"
-}
+// params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
+// params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
+// params.saveReference = false
 
 // R library locations
 params.rlocation = "$HOME/R/nxtflow_libs/"
@@ -66,11 +64,51 @@ maxlen = params.max
 params.notrim = false
 notrim = params.notrim
 
+/*
+ *  SETUP & Check required files
+ */
+
+genomeFastaFile = params.genomeFasta ? file(params.genomeFasta) : null
+genomeAnno      = params.genomeAnno ? file(params.genomeAnno) : null
+mirArmAnno      = params.mirArmAnno ? file(params.mirArmAnno) : null
+virusGenomes    = params.virusGenomes ? file(params.virusGenomes) : null
+rdna            = params.rdna ? file(params.rdna) : null
+readcounts      = file(params.annoreads)
+
+if( !params.genomeFasta || !genomeFastaFile.exists() ) {
+   exit 1, "Genome Fasta file not found: ${params.genomeFasta}. Please download from flybase."
+}
+if ( !params.genomeAnno || !genomeAnno.exists() ) {
+  exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
+}
+if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
+  exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
+}
+if ( !params.rdna || !rdna.exists() ) {
+  exit 1, "rRNA precursor file ${params.rdna} not found. Please download Genbank ID: M21017.1"
+}
+// We could make this conditional, but for now we'll force it in here
+if ( !params.virusGenomes || !virusGenomes.exists() ) {
+  exit 1, "Virus annotation file ${params.virusGenomes} not found. Please check."
+}
+
+// TODO: Put a check in here, to set read counts to 10000000, for default normalisation.
+if (!readcounts.exists()) {
+  exit 1, "Read counts not provided."
+}
+
+/* This allows passing wild card tagged files on CLI:
+ * `--reads <file*.x>`
+ */
+Channel
+  .fromPath( params.reads )
+  .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
+  .set { rawReads }
 
 // Logging
-log.info "==========================================="
-log.info " Ameres Lab sRNAseq pipeline v${version}"
-log.info "==========================================="
+log.info "==================================================="
+log.info "  Ameres Lab miRNA SLAMseq best practice v${version}"
+log.info "==================================================="
 log.info "Reads                : ${params.reads}"
 if (params.genome) log.info "Genome               : ${params.genome}"
 log.info "Genome Annotation    : ${params.genomeAnno}"
@@ -87,39 +125,96 @@ log.info "Output dir           : ${params.outdir}"
 log.info "Config Profile       : ${workflow.profile}"
 log.info "==========================================="
 
+
 /*
- *  SETUP -- Error checking
+ *  STEP 0a - Get rRNA, tRNA, sn and snoRNA from genome with biomaRt
+ *            Concat genomic rRNA with rRNA precursor fasta
+ *  Required: rRNA precursor fasta
  */
+process extrIndexNcRNA {
+  tag "Indexing: ncRNAs"
 
-genomeFastaFile = params.genomeFasta ? file(params.genomeFasta) : null
-genomeAnno      = params.genomeAnno ? file(params.genomeAnno) : null
-mirArmAnno      = params.mirArmAnno ? file(params.mirArmAnno) : null
+  input:
+  file rdna
+  file virusGenomes
 
-if( !params.genomeFasta || !genomeFastaFile.exists() ) {
-   exit 1, "Genome Fasta file not found: ${params.genomeFasta}. Please download from flybase."
+  output:
+  file "virus_idx" into viruses
+  file "ribo_idx*" into ribosomes
+  file "tRNA_idx*" into trnas
+  file "snRNA_idx*" into sn
+  file "snoRNA_idx*" into sno
+
+  script:
+  """
+  echo "Building Virus index"
+  samtools faidx $virusGenomes
+  bowtie-build $virusGenomes virus_idx
+
+  echo "Extracting ribosomal, tRNA, snRNA and snoRNA sequences"
+  fetch_ncRNA_fastas.R $baseDir ${params.rlocation}
+
+  cat ribosomes.fa $rdna > ribo.fa
+
+  for fa in ribo tRNA snRNA snoRNA; do
+    echo "Indexing \$fa"
+    samtools faidx \${fa}.fa
+    bowtie-build \${fa}.fa \${fa}_idx
+  done
+  """
 }
 
-if ( !params.genomeAnno || !genomeAnno.exists() ) {
-  exit 1, "Genome annotation file ${params.genomeAnno} not found. Please download from flybase."
-}
-
-if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
-  exit 1, "miRNA Arm annotation file ${params.mirArmAnno} not found."
-}
-
-readcounts      = file(params.annoreads)
-
-// We need to put a check in here, to set read counts to 10000000 or so.
-if (!readcounts.exists()) exit 1, "Read counts not provided."
-
-/* This allows passing wild card tagged files on CLI:
- * `--reads <file*.x>`
+/*
+ *  STEP 0b - Stepwise align: 1) Viruses (if found) 2) Ribo 2) tRNA 3) snRNA 4) snoRNA
  */
-Channel
-  .fromPath( params.reads )
-  .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
-  .set { rawReads }
+process stepWiseAlign {
+  tag "ncRNA-align: $trimmedReads"
+  publishDir path: getOutDir('ncRNA'), mode: "copy", pattern: '*.ncRNA_sorted.bam'
 
+  input:
+  file trimmedReads
+  file vIDX from viruses
+  file riboIDX from ribosomes
+  file tIDX from trnas
+  file snIDX from sn
+  file snoIDX from sno
+
+  output:
+  file "*.unalClean.fq" into goodReads
+
+  script:
+  prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
+  cleanMisMatch = 3
+  // prefix = reads.toString() - ".virusCleaned.fq.gz"
+  """
+  alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
+
+  # \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
+  \$alignCmd $riboIDX -q <(zcat $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
+  \$alignCmd $tIDX -q <(zcat riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
+  \$alignCmd $snIDX -q <(zcat tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
+  \$alignCmd $snoIDX -q <(zcat snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
+
+  # samples="virus ribo tRNA snRNA snoRNA"
+  for sam in \$samples; do
+    samtools view -H TCtag_\${sam}.sam | awk '{
+      if(\$1 ~ /^@SQ/) { print \$0 > \${sam}_sq.txt }
+      if(\$1 ~ /^@PG/) { print \$0" sample: ${prefix}" > \${sam}_pg.txt }
+    }'
+    samtools view -F 4 TCtag_\${sam}.sam >> ncRNA.sam
+  done
+
+  # insert virus_sq and virus_pg
+  cat ribo_sq.txt tRNA_sq.txt snRNA_sq.txt snoRNA_sq.txt > ncRNA_sq.txt
+  cat ribo_pg.txt tRNA_pg.txt snRNA_pg.txt snoRNA_pg.txt > ncRNA_pg.txt
+
+  cat ncRNA_sq.txt ncRNA_pg.txt ncRNA.sam | \
+    samtools view -bS - > ncRNA_unsorted.bam
+
+  samtools sort ncRNA_unsorted.bam -o ${prefix}.ncRNA_sorted.bam
+  """
+  }
+}
 
 /*
  *  STEP 1a - Preprocess reference: Extract hairpin loci from genome
@@ -127,7 +222,7 @@ Channel
  *            in different species, currently only works with fly.
  */
 process extractHairpins {
-  tag "genomePrep"
+  tag "Prep: Get hp sequences"
   publishDir path: getOutDir('ref'), mode: "copy", pattern: 'hairpin*.{fa,bed}'
 
   input:
@@ -171,7 +266,7 @@ process extractHairpins {
  *  STEP 1b - Preprocess reference: Make index
  */
 process makeIndex {
-  tag "Hairpins"
+  tag "Indexing: miR-hairpins"
 
   input:
   file hairpinFasta
@@ -192,7 +287,7 @@ process makeIndex {
  *  Default sequence: `AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG`
  */
 process trim_adapter {
-  tag "$reads"
+  tag "Trim adapter: $reads"
   publishDir path: getOutDir('reports'), mode: "copy", pattern: '*.trim_report.txt'
 
   input:
@@ -205,13 +300,6 @@ process trim_adapter {
   script:
   prefix = reads.toString() - ~/(\.fq)?(\.fastq)?(\.gz)?$/
   """
-  # zcat $reads | paste -d '' - - - - > column.fq
-  # Parallelism doesn't work just yet, joined adapter clipped file is not always grouped properly.
-  # Default adapter: AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTG
-  # parallel --pipepart --line-buffer --round-robin -j ${task.cpus} -a column.fq
-  # tr '' '' | cutadapt -m 26 -M 38\
-  #  -a ${adapter} \
-  #  - 2>> ${prefix}.trim_report.txt | gzip > ${prefix}.adapter_clipped.fq.gz
   cutadapt \
     -m ${minlen} \
     -M ${maxlen} \
@@ -230,7 +318,7 @@ process trim_4N {
    * This relies on seqtk being installed! http://github.com/lh3/seqtk
    * build requirements are only zlib
    */
-  tag "$acReads"
+  tag "Trim 4N: $acReads"
 
   input:
   file acReads from adapterClipped
@@ -257,10 +345,10 @@ process trim_4N {
  * Note: We use bowtie v1.2.2, but likely any aligner could be used
  */
 process bowtie_hairpins {
-  tag "$trimmedReads"
+  tag "hp-Align: $goodReads"
 
   input:
-  file trimmedReads
+  file goodReads
   file index from hairpinIndex
 
   output:
@@ -271,13 +359,8 @@ process bowtie_hairpins {
   prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
   """
   echo "${trimmedReads}" >> postBowtie.log
-  bowtie \
-    -a --best --strata \
-    -v $mismatches \
-    -S \
-    -p ${task.cpus} \
-    $index_base \
-    -q <(zcat $trimmedReads) | \
+  bowtie -a --best --strata -v $mismatches -S -p ${task.cpus} \
+    $index_base -q <(zcat $goodReads) | \
     arrayTagTCreads.awk | \
     samtools view -bS - > ${prefix}.TCtagged_hairpin.bam
   """
@@ -292,7 +375,7 @@ def wrap_hairpin = { file ->
 }
 
 process post_alignment {
-  tag "$hairpinAligned"
+  tag "hp-Align: Sort $hairpinAligned"
   publishDir path: getOutDir('sortedAlignment'), mode: "copy", saveAs: wrap_hairpin
 
   input:
@@ -324,7 +407,7 @@ process writeJson {
    *   Then `writeJson` will run after that is all done.
    *   Currently we only map, and take sRNAcounts from an externally provided sample file
    */
-
+  tag "Stats: create json"
   publishDir path: getOutDir('json'), mode: "copy", pattern: '*.json'
 
   input:
@@ -399,6 +482,7 @@ process writeJson {
  */
 
 process alignmentStats {
+  tag "Stats: count reads"
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:
@@ -423,6 +507,7 @@ process alignmentStats {
  *                                 provided in `filteredPositions.tsv`
  */
 process mutationStats {
+  tag "Stats: mutation rates"
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:

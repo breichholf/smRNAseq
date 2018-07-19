@@ -11,14 +11,14 @@ preMirFastaFile <- as.character(args[6])
 
 source(file.path(scriptDir, 'bin/functions.R'))
 
-setupRlibs(R_libs)
-
 # Packages loaded in setupRlibs
 #library(tidyverse)
 #library(Biostrings)
 #library(BiocParallel)
 
-sessionInfo()
+setupRlibs(R_libs)
+pacman::p_load(Biostrings, Rsamtools, BiocParallel, jsonlite, tidyverse)
+sessioninfo::session_info()
 
 cfg <- getcfg(jsonFile)
 
