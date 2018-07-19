@@ -32,7 +32,7 @@ rRNA.unique <- martWseqs %>% filter(gene_biotype == "rRNA") %>% group_by(seq) %>
 tRNA.unique <- martWseqs %>% filter(gene_biotype == "tRNA") %>% group_by(seq) %>% top_n(1)
 snRNA.unique <- martWseqs %>% filter(gene_biotype == "snRNA") %>% group_by(seq) %>% top_n(1)
 snoRNA.unique <- martWseqs %>% filter(gene_biotype == "snoRNA") %>% group_by(seq) %>% top_n(1) %>%
-  group_by(flybase_transcript_id) %>% filter(end_position - start_position + 21 == str_length(seq)))
+  group_by(flybase_transcript_id) %>% filter(end_position - start_position + 21 == str_length(seq))
 
 write.fasta(as.list(rRNA.unique$seq), rRNA.unique$longName, "ribosomes.fa")
 write.fasta(as.list(tRNA.unique$seq), tRNA.unique$longName, "tRNA.fa")
