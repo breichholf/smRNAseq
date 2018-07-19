@@ -87,10 +87,10 @@ if ( !params.mirArmAnno || !mirArmAnno.exists() ) {
 if ( !params.rdna || !rdna.exists() ) {
   exit 1, "rRNA precursor file ${params.rdna} not found. Please download Genbank ID: M21017.1"
 }
-// We could make this conditional, but for now we'll force it in here
-if ( !params.virusGenomes || !virusGenomes.exists() ) {
-  exit 1, "Virus annotation file ${params.virusGenomes} not found. Please check."
-}
+// Not yet in use
+// if ( !params.virusGenomes || !virusGenomes.exists() ) {
+//   exit 1, "Virus annotation file ${params.virusGenomes} not found. Please check."
+// }
 
 // TODO: Put a check in here, to set read counts to 10000000, for default normalisation.
 if (!readcounts.exists()) {
