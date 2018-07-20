@@ -132,7 +132,8 @@ log.info "==========================================="
  *  Required: rRNA precursor fasta
  */
 process extrIndexNcRNA {
-  tag "Indexing: ncRNAs"
+  tag "Extract & Index: ncRNAs"
+  publishDir path: getOutDir('ref'), mode: "copy", pattern: 'ncRNA_total.fa'
 
   input:
   file rdna
@@ -144,6 +145,7 @@ process extrIndexNcRNA {
   file "tRNA_idx*" into trnas
   file "snRNA_idx*" into sn
   file "snoRNA_idx*" into sno
+  file "ncRNA_total.fa" into ncFasta
 
   script:
   """
@@ -161,6 +163,8 @@ process extrIndexNcRNA {
     samtools faidx \${fa}.fa
     bowtie-build \${fa}.fa \${fa}_idx
   done
+
+  cat ribo.fa tRNA.fa snRNA.fa snoRNA.fa > ncRNA_total.fa
   """
 }
 
@@ -320,6 +324,8 @@ process stepWiseAlign {
   # samples="virus ribo tRNA snRNA snoRNA"
   samples="ribo tRNA snRNA snoRNA"
 
+  # Potentially could be done in a for loop elegantly with exportSamHeaders.awk
+  # IDX_base is just one of `samples` with "_idx" added
   \$alignCmd $rIDX_base -q <(zcat -f $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
   \$alignCmd $tIDX_base -q <(zcat -f riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
   \$alignCmd $snIDX_base -q <(zcat -f tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
@@ -346,7 +352,7 @@ process stepWiseAlign {
  * STEP 3: Align
  * Note: We use bowtie v1.2.2, but likely any aligner could be used
  */
-process bowtie_hairpins {
+process alignHairpins {
   tag "hp-Align: $goodReads"
 
   input:
@@ -376,7 +382,7 @@ def wrap_hairpin = { file ->
   if (file.contains("hairpin")) return "ext_hairpins/$file"
 }
 
-process post_alignment {
+process sortMirBams {
   tag "hp-Align: Sort $hairpinAligned"
   publishDir path: getOutDir('sortedAlignment'), mode: "copy", saveAs: wrap_hairpin
 
@@ -405,7 +411,7 @@ process writeJson {
   /*
    * INFO:
    *   `file sortedBams from hairpinSorted.collect()` takes care of staging
-   *   This way `post_alignment` can still run in parallel, for each sample.
+   *   This way `sortMirBams` can still run in parallel, for each sample.
    *   Then `writeJson` will run after that is all done.
    *   Currently we only map, and take sRNAcounts from an externally provided sample file
    */
@@ -483,8 +489,8 @@ process writeJson {
  *                              -) Processing data as 'ready to plot'
  */
 
-process alignmentStats {
-  tag "Stats: count reads"
+process mirCounts {
+  tag "Stats: count miR reads"
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:
@@ -503,13 +509,33 @@ process alignmentStats {
   """
 }
 
+process ncRNAcounts {
+  tag "Stats: count ncRNAs"
+  publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
+
+  input:
+  file readCountConfig
+  file ncFasta
+
+  output:
+  file 'ncRNACounts.tsv' into ncRNACounts
+  file 'filteredNcPositions.tsv' into topNcPositions
+  file 'filteredNcLenDis.tsv' into ncLendisTSV
+
+  script:
+  """
+  export OMP_NUM_THREADS=${task.cpus}
+  getNcRNACounts.R $baseDir ${params.rlocation} $readCountConfig $ncFasta
+  """
+}
+
 /*
  *  STEP 5c - Postprocessing -- Process BAM files in parallel using BiocParallel
  *                              -) Get mutations for all positions in a miR, for all miRNAs
  *                                 provided in `filteredPositions.tsv`
  */
-process mutationStats {
-  tag "Stats: mutation rates"
+process mirMutStats {
+  tag "Stats: miR mutation rates"
   publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
 
   input:
@@ -529,5 +555,31 @@ process mutationStats {
   export TMP=/scratch-ii2/users/reichholf/tmp
   export TEMP=/scratch-ii2/users/reichholf/tmp
   getMutStats.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topPositions $hairpinFasta
+  """
+}
+
+// For ncRNA we want to get mutation rates only from specific length isoforms
+// We'll compare groups of 20-24nt and 25-29nt
+process ncMutStats {
+  tag "Stats: ncRNA mutation rates"
+  publishDir path: getOutDir('stats'), mode: "copy", pattern: "*.tsv"
+
+  input:
+  file readCountConfig
+  file topNcPositions
+  file ncFasta
+
+  output:
+  file 'ncRNAs.wAllMuts.tsv' into ncMutStats
+  file 'ncMutCodes.tsv' into ncMuts
+  file 'ncMutsWide.tsv' into wideNcMuts
+
+  script:
+  """
+  export OMP_NUM_THREADS=${task.cpus}
+  export TMPDIR=/scratch-ii2/users/reichholf/tmp
+  export TMP=/scratch-ii2/users/reichholf/tmp
+  export TEMP=/scratch-ii2/users/reichholf/tmp
+  getNcMutStats.R $baseDir ${params.rlocation} ${task.cpus} $readCountConfig $topNcPositions $ncFasta
   """
 }

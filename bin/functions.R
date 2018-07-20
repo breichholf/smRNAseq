@@ -244,7 +244,10 @@ parallelMutsLenRestrict <- function(locus, timepoint, time, pos, biotype, bamFil
   start.pos <- pos
   end.pos <- start.pos + 30
 
-  pparam <- PileupParam(query_bins = seq(0,30), max_depth=50000000, min_mapq=0, min_base_quality=0)
+  if (maxLen < 30) { lastBin <- maxLen }
+  else { lastBin <- 30 }
+
+  pparam <- PileupParam(query_bins = seq(0,lastBin), max_depth=50000000, min_mapq=0, min_base_quality=0)
   sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
                          which=GRanges(miR, IRanges(start.pos, end.pos)))
 
@@ -263,7 +266,7 @@ parallelMutsLenRestrict <- function(locus, timepoint, time, pos, biotype, bamFil
     pileupResult %>%
     dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
-           flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
+           locus = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint,
            time = time,
            mir.type = mir.type,
