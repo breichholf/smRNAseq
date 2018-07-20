@@ -317,13 +317,14 @@ process stepWiseAlign {
   // \$alignCmd $vIDX -q <(zcat $trimmedReads) --un vClean.fq | arrayTagTCreads.awk > TCtag_virus.sam
   """
   alignCmd="bowtie -a --best --strata -v $cleanMisMatch -S -p ${task.cpus}"
+  # samples="virus ribo tRNA snRNA snoRNA"
+  samples="ribo tRNA snRNA snoRNA"
 
   \$alignCmd $rIDX_base -q <(zcat -f $trimmedReads) --un riboClean.fq | arrayTagTCreads.awk > TCtag_ribo.sam
   \$alignCmd $tIDX_base -q <(zcat -f riboClean.fq) --un tClean.fq | arrayTagTCreads.awk > TCtag_tRNA.sam
   \$alignCmd $snIDX_base -q <(zcat -f tClean.fq) --un snClean.fq | arrayTagTCreads.awk > TCtag_snRNA.sam
   \$alignCmd $snoIDX_base -q <(zcat -f snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
 
-  # samples="virus ribo tRNA snRNA snoRNA"
   for sam in \$samples; do
     samtools view -H TCtag_\${sam}.sam | awk '{
       if(\$1 ~ /^@SQ/) { print \$0 > \${sam}_sq.txt }
