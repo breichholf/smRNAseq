@@ -326,10 +326,8 @@ process stepWiseAlign {
   \$alignCmd $snoIDX_base -q <(zcat -f snClean.fq) --un ${prefix}.unalClean.fq | arrayTagTCreads.awk > TCtag_snoRNA.sam
 
   for sam in \$samples; do
-    samtools view -H TCtag_\${sam}.sam | awk '{
-      if(\$1 ~ /^@SQ/) { print \$0 > \${sam}_sq.txt }
-      if(\$1 ~ /^@PG/) { print \$0" sample: ${prefix}" > \${sam}_pg.txt }
-    }'
+    samtools view -H TCtag_\${sam}.sam | \
+      exportSamHeaders.awk -v sample=\$sam fileBase=${prefix}
     samtools view -F 4 TCtag_\${sam}.sam >> ncRNA.sam
   done
 
