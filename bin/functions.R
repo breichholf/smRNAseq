@@ -24,10 +24,13 @@ getcfg <- function(json) {
 
   cfg.info <- jsonlite::read_json(json)
   file.home <- cfg.info$base
+  file.ncRNA <- cfg.info$ncBase
   mir.anno <- read_tsv(cfg.info$mir.anno)
 
   cfg.samples <- dplyr::bind_rows(cfg.info$samples)
-  cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
+  cfg.samples <- mutate(cfg.samples,
+                        align = file.path(file.home, align),
+                        ncBam = file.path(file.ncRNA, ncBam))
 
   return(list("samples" = cfg.samples, "anno" = mir.anno))
 }
@@ -37,7 +40,7 @@ getcfg <- function(json) {
 # 3) Counts all reads (and all TC reads with BQ>27) for given starting position
 # 4) Assesses read lengths
 # 5) Normalises reads to sRNAreads provided in cfg file
-getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, ...) {
+getAllCounts <- function(id, align, ncBam, sRNAreads, time, mirAnno = NULL, topn = 5, ...) {
   suppressMessages(require(tidyverse))
   suppressMessages(require(Rsamtools))
   mapInfo <- c("rname", "strand", "pos")
@@ -162,14 +165,14 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
 # 3) Counts all reads (and all TC reads with BQ>27) for given starting position
 # 4) Assesses read lengths
 # 5) Normalises reads to sRNAreads provided in cfg file
-getNcRNACounts <- function(id, align, sRNAreads, time, topn = 10, ...) {
+getNcRNACounts <- function(id, align, ncBam, sRNAreads, time, topn = 10, ...) {
   suppressMessages(require(tidyverse))
   suppressMessages(require(Rsamtools))
   mapInfo <- c("rname", "strand", "pos")
   mapParams <- ScanBamParam(what = c(mapInfo, "seq"), tag = c("TC", "TN"),
                             flag = scanBamFlag(isMinusStrand = FALSE, isUnmappedQuery = FALSE))
   filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
-  filterBam <- filterBam(align, tempfile(), filter = filterNs)
+  filterBam <- filterBam(ncBam, tempfile(), filter = filterNs)
   bam <- scanBam(filterBam, param = mapParams)
   # Now this will ONLY handle files that have tags TC and TN, too!
   map.r <- dplyr::bind_cols(do.call(dplyr::bind_cols, bam[[1]][mapInfo]),

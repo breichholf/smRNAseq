@@ -295,9 +295,14 @@ process trim_4N {
 /*
  *  STEP 3.0b - Stepwise align: 1) Viruses (if found) 2) Ribo 2) tRNA 3) snRNA 4) snoRNA
  */
+
+def wrap_NcRNA = { file ->
+  if (file.contains("ncRNA_sorted")) return "$file"
+}
+
 process stepWiseAlign {
   tag "ncRNA-align: $trimmedReads"
-  publishDir path: getOutDir('ncRNA'), mode: "copy", pattern: '*.ncRNA_sorted.bam'
+  publishDir path: getOutDir('ncRNA'), mode: "copy", saveAs: wrap_NcRNA
 
   input:
   file trimmedReads
@@ -309,6 +314,8 @@ process stepWiseAlign {
 
   output:
   file "*.unalClean.fq" into goodReads
+  file "${prefix}.ncRNA_sorted.bam" into ncSorted
+  file "${prefix}.ncRNA_sorted.bam.bai" into ncSortedIndex
 
   script:
   prefix = trimmedReads.toString() - ~/(_trimmed)?(\.fq)?(\.fastq)?(\.gz)?$/
@@ -345,6 +352,7 @@ process stepWiseAlign {
     samtools view -bS - > ncRNA_unsorted.bam
 
   samtools sort ncRNA_unsorted.bam -o ${prefix}.ncRNA_sorted.bam
+  samtools index ${prefix}.ncRNA_sorted.bam
   """
 }
 
@@ -379,7 +387,7 @@ process alignHairpins {
  */
 
 def wrap_hairpin = { file ->
-  if (file.contains("hairpin")) return "ext_hairpins/$file"
+  if (file.contains("hairpin")) return "$file"
 }
 
 process sortMirBams {
@@ -420,6 +428,7 @@ process writeJson {
 
   input:
   file sortedBams from hairpinSorted.toSortedList()
+  file sortedNcRNAs from ncSorted.toSortedList()
   file counts from hairpinCounts.toSortedList()
   file readcounts
 
@@ -427,7 +436,8 @@ process writeJson {
   file "samples.json" into readCountConfig
 
   script:
-  absOutDir = getOutDir('sortedAlignment')
+  mirOutDir = getOutDir('sortedAlignment')
+  ncOutDir = getOutDir('ncRNA')
 
   """
   #!/usr/bin/env python
@@ -436,7 +446,10 @@ process writeJson {
   import pandas as pd
 
   bamfiles = [os.path.basename(b) for b in "$sortedBams".split(' ')]
-  jsDict = {"base": "${absOutDir}/ext_hairpins",
+  ncFiles = [os.path.basename(n) for n in "$sortedNcRNAs".split(' ')]
+
+  jsDict = {"base": "${mirOutDir}",
+            "ncBase": "${ncOutDir}",
             "mir.anno": "$mirArmAnno"}
 
   readCounts = pd.read_table("$readcounts")
@@ -455,12 +468,14 @@ process writeJson {
     nameElements = bam.split('_')
     idx = int(nameElements[0])
     # sRNAreads = 1000000
+    ncBam = [n for n in ncFiles if n.startswith(str(idx))][0]
     sRNAreads = readCounts[readCounts.idx == idx]['sRNAreads'].values[0]
     time = readCounts[readCounts.idx == idx]['time'].values[0]
     miRNAreads = readCounts[readCounts.idx == idx]['miRNAreads'].values[0]
     samples.append({"id": idx,
                     "time": time,
                     "align": bam,
+                    "ncBam": ncBam,
                     "sRNAreads": sRNAreads,
                     "miRNAreads": miRNAreads})
 

@@ -79,7 +79,7 @@ mirMutCodes <-
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl('>', mutCode)) %>%
   ungroup() %>%
-  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type)
+  dplyr::select(-refNuc, -nucleotide, -count, -(`5p`:`3p`), -align, -ncBam, -full.seq, -mir_name, -read.type)
 
 # Switch to wide format for smoother excel copy/paste
 mirMutsWide <-

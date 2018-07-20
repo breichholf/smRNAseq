@@ -43,8 +43,8 @@ tidyRefNucs <-
 ncPosWFiles <-
   mirPositions %>%
   left_join(cfg$samples, by = c('timepoint' = 'id', 'time')) %>%
-  mutate(bamFile = file.path(align)) %>%
-  dplyr::filter(!is.na(align)) %>%
+  mutate(bamFile = file.path(ncBam)) %>%
+  dplyr::filter(!is.na(ncBam)) %>%
   left_join(refTbl) %>%
   dplyr::filter(average.ppm >= 5, read.type == "totalReads") %>%
   dplyr::rename(totalReads = reads)
@@ -78,7 +78,7 @@ ncMutCodes <-
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl('>', mutCode)) %>%
   ungroup() %>%
-  dplyr::select(-refNuc, -nucleotide, -count, -align, -full.seq, -read.type)
+  dplyr::select(-refNuc, -nucleotide, -count, -align, -ncBam, -full.seq, -read.type)
 
 # Switch to wide format for smoother excel copy/paste
 ncMutsWide <-
