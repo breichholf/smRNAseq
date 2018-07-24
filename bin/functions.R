@@ -222,19 +222,18 @@ getNcRNACounts <- function(id, align, ncBam, sRNAreads, time, topn = 10, ...) {
   return(read.summary.topnPos)
 }
 
-pileupMutsLenRestrict <- function(groupedData, mc.param, minLen, maxLen) {
+pileupMutsLenRestrict <- function(groupedData, minLen, maxLen, mc.param) {
   suppressMessages(require(BiocParallel))
   suppressMessages(require(dplyr))
 
-  fbid <- groupedData$flybase_id
+  locus <- groupedData$locus
   bF <- unique(groupedData$bamFile)
   tp <- groupedData$timepoint
   t <- groupedData$time
   pos <- groupedData$pos
-  mir.type <- groupedData$mir.type
 
-  doOut <- bpmapply(parallelMutsLenRestrict, miR = fbid, timepoint = tp, time = t, pos = pos,
-                    mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = minLen, maxLen = maxLen),
+  doOut <- bpmapply(parallelMutsLenRestrict, locus = locus, timepoint = tp, time = t, pos = pos,
+                    MoreArgs = list(bamFile = bF, minLen = minLen, maxLen = maxLen),
                     SIMPLIFY = FALSE, BPPARAM = mc.param)
 
   return(dplyr::bind_rows(doOut))
@@ -252,7 +251,7 @@ parallelMutsLenRestrict <- function(locus, timepoint, time, pos, biotype, bamFil
 
   pparam <- PileupParam(query_bins = seq(0,lastBin), max_depth=50000000, min_mapq=0, min_base_quality=0)
   sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
-                         which=GRanges(miR, IRanges(start.pos, end.pos)))
+                         which=GRanges(locus, IRanges(start.pos, end.pos)))
 
   filterNsAndLens <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq),
                                       MinLen = function(x) nchar(x$seq) >= minLen,
@@ -272,7 +271,6 @@ parallelMutsLenRestrict <- function(locus, timepoint, time, pos, biotype, bamFil
            locus = as.character(seqnames), # Coerce factor to character to avoid warning later on
            timepoint = timepoint,
            time = time,
-           mir.type = mir.type,
            start.pos = start.pos) %>%
     dplyr::select(-seqnames, -query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= maxLen) # Retain all mutations

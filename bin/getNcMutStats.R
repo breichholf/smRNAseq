@@ -57,7 +57,7 @@ mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
 ncsWmuts <-
   ncPosWFiles %>%
   group_by(bamFile) %>%
-  do(muts = pileupMutsLenRestrict(groupedData = ., mc.param = mc.param, minLen = agoSubstrMinLen, maxLen = agoSubstrMaxLen)) %>%
+  do(muts = pileupMutsLenRestrict(groupedData = ., minLen = agoSubstrMinLen, maxLen = agoSubstrMaxLen, mc.param = mc.param)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
   left_join(tidyRefNucs, by = c('locus', 'pos' = 'idx')) %>%
