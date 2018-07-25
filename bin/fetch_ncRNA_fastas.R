@@ -20,8 +20,8 @@ attribList <- c('gene_biotype', 'ensembl_gene_id', 'external_gene_name', 'flybas
 
 martDf <- getBM(attributes = attribList, filters = 'biotype', values = lookupTypes, mart = ensembl)
 
-seqDf <- biomaRt::getSequence(id = martDf$flybase_gene_id, downstream = 20,
-    type = "flybase_gene_id", seqType = "transcript_exon_intron", mart = ensembl)
+seqDf <- biomaRt::getSequence(id = martDf$flybase_gene_id, type = "flybase_gene_id",
+                              seqType = "transcript_exon_intron", mart = ensembl)
 
 martWseqs <-
   left_join(martDf, seqDf) %>%
