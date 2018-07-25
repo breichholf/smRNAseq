@@ -540,7 +540,7 @@ process ncRNAcounts {
   script:
   """
   export OMP_NUM_THREADS=${task.cpus}
-  getNcRNACounts.R $baseDir ${params.rlocation} $readCountConfig $ncFasta
+  getNcRNACounts.R $baseDir ${params.rlocation} $readCountConfig $ncFasta 20 24
   """
 }
 

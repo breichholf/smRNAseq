@@ -6,6 +6,8 @@ scriptDir <- as.character(args[1])
 R_libs <- as.character(args[2])
 jsonFile <- as.character(args[3])
 fastaFile <- as.character(args[4])
+minLen <- as.numeric(args[5])
+maxLen <- as.numeric(args[6])
 
 source(file.path(scriptDir, "bin/functions.R"))
 
@@ -28,9 +30,6 @@ seqBodyLength <- 18
 # How many IDs do we have? Should correspond with unique entries in cfg$samples
 ids <- cfg$samples %>% select(id) %>% distinct()
 idCount <- dim(ids)[1]
-
-minLen <- 20
-maxLen <- 24
 
 # `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
 # General columns (pos = start position):
