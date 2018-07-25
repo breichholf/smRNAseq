@@ -29,13 +29,16 @@ seqBodyLength <- 18
 ids <- cfg$samples %>% select(id) %>% distinct()
 idCount <- dim(ids)[1]
 
+minLen <- 20
+maxLen <- 24
+
 # `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
 # General columns (pos = start position):
 #  - pos, seqLen, locus
 #
 # Columns (per ID) -- all normalised to sRNAreads from cfg$samples:
 #  - tcLenDis.<libID>    tcReads.<libID>    totalLenDis.<libID>    totalReads.<libID>
-allCounts <- cfg$samples %>% pmap(getNcRNACounts) %>% purrr::reduce(full_join)
+allCounts <- cfg$samples %>% pmap(getNcRNACounts, minLen = minLen, maxLen = maxLen) %>% purrr::reduce(full_join)
 
 allCounts %>% write_tsv('ncRNACounts.tsv')
 

@@ -134,9 +134,9 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
   start.pos <- pos
   end.pos <- start.pos + 30
 
-  pparam <- PileupParam(query_bins = seq(0,30), max_depth=50000000, min_mapq=0, min_base_quality=0)
+  pparam <- PileupParam(query_bins = seq(0,30), max_depth = 50000000, min_mapq = 0, min_base_quality = 0)
   sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
-                         which=GRanges(miR, IRanges(start.pos, end.pos)))
+                         which = GRanges(miR, IRanges(start.pos, end.pos)))
 
   filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
   filterBam <- filterBam(bamFile, tempfile(),
@@ -165,13 +165,15 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
 # 3) Counts all reads (and all TC reads with BQ>27) for given starting position
 # 4) Assesses read lengths
 # 5) Normalises reads to sRNAreads provided in cfg file
-getNcRNACounts <- function(id, align, ncBam, sRNAreads, time, topn = 10, ...) {
+getNcRNACounts <- function(id, align, ncBam, sRNAreads, time, topn = 10, minLen = 18, maxLen = 30, ...) {
   suppressMessages(require(tidyverse))
   suppressMessages(require(Rsamtools))
   mapInfo <- c("rname", "strand", "pos")
   mapParams <- ScanBamParam(what = c(mapInfo, "seq"), tag = c("TC", "TN"),
                             flag = scanBamFlag(isMinusStrand = FALSE, isUnmappedQuery = FALSE))
-  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
+  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq),
+                               MinLen = function(x) nchar(x$seq) >= minLen,
+                               MaxLen = function(x) nchar(x$seq) <= maxLen))
   filterBam <- filterBam(ncBam, tempfile(), filter = filterNs)
   bam <- scanBam(filterBam, param = mapParams)
   # Now this will ONLY handle files that have tags TC and TN, too!
@@ -249,9 +251,9 @@ parallelMutsLenRestrict <- function(locus, timepoint, time, pos, biotype, bamFil
   if (maxLen < 30) { lastBin <- maxLen }
   else { lastBin <- 30 }
 
-  pparam <- PileupParam(query_bins = seq(0,lastBin), max_depth=50000000, min_mapq=0, min_base_quality=0)
+  pparam <- PileupParam(query_bins = seq(0,lastBin), max_depth = 50000000, min_mapq = 0, min_base_quality = 0)
   sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
-                         which=GRanges(locus, IRanges(start.pos, end.pos)))
+                         which = GRanges(locus, IRanges(start.pos, end.pos)))
 
   filterNsAndLens <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq),
                                       MinLen = function(x) nchar(x$seq) >= minLen,
