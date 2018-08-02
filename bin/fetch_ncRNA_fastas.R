@@ -1,9 +1,20 @@
 #!/usr/bin/env Rscript
 
+possibleTypes <- c('rRNA', 'tRNA', 'snoRNA', 'snRNA', 'pre_miRNA')
+
 # Command line arguments
-args = commandArgs(trailingOnly=TRUE)
+args <- commandArgs(trailingOnly=TRUE)
 scriptDir <- as.character(args[1])
 R_libs <- as.character(args[2])
+lookupType <- as.character(args[3])
+outName <- as.character(args[4])
+downstreamNT <- if(length(args) == 5) as.numeric(args[5]) else 0
+
+if (!(lookupType %in% possibleTypes)) {
+    possTypeStr <- paste0("(", paste(possibleTypes, collapse = " "), ")")
+    errorMessage <- paste("Lookup type", lookupType, "not amongst accepted types:", possTypeStr)
+    stop(errorMessage)
+}
 
 source(file.path(scriptDir, "bin/functions.R"))
 
@@ -13,14 +24,12 @@ sessioninfo::session_info()
 
 ensembl <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "dmelanogaster_gene_ensembl")
 
-lookupTypes <- c('tRNA', 'rRNA', 'snoRNA', 'snRNA')
-
 attribList <- c('gene_biotype', 'ensembl_gene_id', 'external_gene_name', 'flybase_gene_id', 'flybase_transcript_id',
                 'chromosome_name', 'start_position', 'end_position', 'strand')
 
-martDf <- getBM(attributes = attribList, filters = 'biotype', values = lookupTypes, mart = ensembl)
+martDf <- getBM(attributes = attribList, filters = 'biotype', values = lookupType, mart = ensembl)
 
-seqDf <- biomaRt::getSequence(id = martDf$flybase_gene_id, type = "flybase_gene_id",
+seqDf <- biomaRt::getSequence(id = martDf$flybase_gene_id, type = "flybase_gene_id", downstream = downstreamNT,
                               seqType = "transcript_exon_intron", mart = ensembl)
 
 martWseqs <-
@@ -28,13 +37,16 @@ martWseqs <-
   rename(seq = transcript_exon_intron) %>%
   mutate(longName = paste(flybase_gene_id, flybase_transcript_id, external_gene_name, gene_biotype, sep = "|"))
 
-rRNA.unique <- martWseqs %>% filter(gene_biotype == "rRNA") %>% group_by(seq) %>% top_n(1)
-tRNA.unique <- martWseqs %>% filter(gene_biotype == "tRNA") %>% group_by(seq) %>% top_n(1)
-snRNA.unique <- martWseqs %>% filter(gene_biotype == "snRNA") %>% group_by(seq) %>% top_n(1)
-snoRNA.unique <- martWseqs %>% filter(gene_biotype == "snoRNA") %>% group_by(seq) %>% top_n(1) %>%
-  group_by(flybase_transcript_id) %>% filter(end_position - start_position + 21 == str_length(seq))
+# We include the hackey end_position - start_position filter, as there is one snoRNA that misbehaves and is extracted twice
+# One where the sequence length matches the difference between start and end, and another that doesn't
+# Apart from that both entries are the same
+# Using arrange(flybase_transcript_id) we ensure consistent naming across different runs of the script.
+unique.seqs <-
+  martWseqs %>%
+  group_by(flybase_transcript_id) %>%
+  filter(end_position - start_position + 1 + downstreamNT == str_length(seq)) %>%
+  group_by(seq) %>%
+  arrange(flybase_transcript_id) %>%
+  filter(row_number == min(row_number()))
 
-write.fasta(as.list(rRNA.unique$seq), rRNA.unique$longName, "ribosomes.fa")
-write.fasta(as.list(tRNA.unique$seq), tRNA.unique$longName, "tRNA.fa")
-write.fasta(as.list(snRNA.unique$seq), snRNA.unique$longName, "snRNA.fa")
-write.fasta(as.list(snoRNA.unique$seq), snoRNA.unique$longName, "snoRNA.fa")
+write.fasta(as.list(unique.seqs$seq), unique.seqs$longName, outName)

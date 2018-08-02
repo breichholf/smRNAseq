@@ -154,7 +154,11 @@ process extrIndexNcRNA {
   # bowtie-build $virusGenomes virus_idx
 
   echo "Extracting ribosomal, tRNA, snRNA and snoRNA sequences"
-  fetch_ncRNA_fastas.R $baseDir ${params.rlocation}
+  fetch_ncRNA_fastas.R $baseDir ${params.rlocation} rRNA ribosomes.fa
+  fetch_ncRNA_fastas.R $baseDir ${params.rlocation} tRNA tRNA.fa
+  fetch_ncRNA_fastas.R $baseDir ${params.rlocation} snRNA snRNA.fa
+  fetch_ncRNA_fastas.R $baseDir ${params.rlocation} snoRNA snoRNA.fa
+  # fetch_ncRNA_fastas.R $baseDir ${params.rlocation} miRNA miRNA.fa 20
 
   cat ribosomes.fa $rdna > ribo.fa
 
