@@ -47,6 +47,6 @@ unique.seqs <-
   filter(end_position - start_position + 1 + downstreamNT == str_length(seq)) %>%
   group_by(seq) %>%
   arrange(flybase_transcript_id) %>%
-  filter(row_number == min(row_number()))
+  filter(row_number() == min(row_number()))
 
 write.fasta(as.list(unique.seqs$seq), unique.seqs$longName, outName)
