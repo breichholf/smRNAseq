@@ -2,72 +2,22 @@ setupRlibs <- function(R_lib){
   .libPaths( c( .libPaths(), R_lib ) )
 
   if(!require("pacman")) {
-    install.packages("pacman", dependencies = TRUE, repos = 'http://cloud.r-project.org/')
+    install.packages("pacman", dependencies = TRUE,
+                     repos = "http://cloud.r-project.org/")
   }
 
   p_load(rlang)
 
 
   p_install_version(
-    c('rlang', 'tidyverse', 'cowplot', 'Biostrings', 'Rsamtools', 'BiocParallel', 'jsonlite'),
-    c('0.2.1', '1.2.1', '0.9.2', '2.44.2', '1.28.0', '1.10.1', '1.5')
+    c("rlang", "tidyverse", "cowplot", "Biostrings", "Rsamtools",
+      "BiocParallel", "jsonlite"),
+    c("0.2.1", "1.2.1", "0.9.2", "2.44.2", "1.28.0", "1.10.1", "1.5")
   )
 
-  pacman::p_load(rlang, tidyverse, cowplot, Biostrings, Rsamtools, BiocParallel, jsonlite)
-
-  # Install minimal versions of:
-  # stringr, forcats, purrr, readr, tibble, tidyr, cowplot, knitr, dplyr, ggplot, tidyverse
-  # if (!require("Biostrings")){
-  #   source("http://bioconductor.org/biocLite.R")
-  #   biocLite("Biostrings", suppressUpdates=TRUE)
-  # }
-
-  # if (!require("Rsamtools")){
-  #   source("http://bioconductor.org/biocLite.R")
-  #   biocLite("Rsamtools", suppressUpdates=TRUE)
-  # }
-
-  # if (!require("BiocParallel")){
-  #   source("http://bioconductor.org/biocLite.R")
-  #   biocLite("BiocParallel", suppressUpdates=TRUE)
-  # }
-
-  # if (!require("stringr")){
-  #   install.packages("stringr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("forcats")){
-  #   install.packages("forcats", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("purrr")){
-  #   install.packages("purrr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("readr")){
-  #   install.packages("readr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("tibble")) {
-  #   install.packages("tibble", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("tidyr")) {
-  #   install.packages("tidyr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("cowplot")) {
-  #   install.packages("cowplot", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("knitr")) {
-  #   install.packages("knitr", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  # }
-
-  # if (!require("optparse")) {
-  #   install.packages("optparse", dependencies=TRUE, repos='http://cloud.r-project.org/')
-  #   library("optparse")
-  # }
+  # Load Tidyverse as late as possible to overload `filter`, `select` and `rename` functions
+  pacman::p_load(Biostrings, Rsamtools, BiocParallel, rlang,
+                 tidyverse, cowplot, jsonlite)
 
 }
 
@@ -87,17 +37,19 @@ getcfg <- function(json) {
 }
 
 # 1) Reads bam
-# 2) Filters out reads that don't map with in +/- 5 of annotated 5p and 3p arms
+# 2) Filters out reads that don"t map with in +/- 5 of annotated 5p and 3p arms
 # 3) Counts all reads (and all TC reads with BQ>27) for given starting position
 # 4) Assesses read lengths
 # 5) Normalises reads to sRNAreads provided in cfg file
-getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, ...) {
+getAllCounts <- function(id, align, sRNAreads, time,
+                         mirAnno = NULL, topn = 5, ...) {
   suppressMessages(require(tidyverse))
   suppressMessages(require(Rsamtools))
   mapInfo <- c("rname", "strand", "pos")
   mapParams <- ScanBamParam(what = c(mapInfo, "seq"), tag = c("TC", "TN"),
-                            flag = scanBamFlag(isMinusStrand = FALSE, isUnmappedQuery = FALSE))
-  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
+                            flag = scanBamFlag(isMinusStrand = FALSE,
+                                               isUnmappedQuery = FALSE))
+  filterNs <- FilterRules(list(NoAmbigNucs = function(x) !grepl("N", x$seq)))
   filterBam <- filterBam(align, tempfile(), filter = filterNs)
   bam <- scanBam(filterBam, param = mapParams)
   # Now this will ONLY handle files that have tags TC and TN, too!
@@ -132,7 +84,8 @@ getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, .
   # Only keep reads that are within +/-10nt of the suggested 5p/3p arm positions
   read.summary.closestArms <-
     read.summary %>%
-    dplyr::filter((pos >= `5p` - 10 & pos <= `5p` + 10) | (pos >= `3p` - 10 & pos <= `3p` + 10)) %>%
+    dplyr::filter((pos >= `5p` - 10 & pos <= `5p` + 10) |
+                  (pos >= `3p` - 10 & pos <= `3p` + 10)) %>%
     mutate(arm.name = ifelse(pos >= `5p` - 10 & pos <= `5p` + 10,
                              paste0(str_sub(mir_name, 5, -1), "-5p"),
                              paste0(str_sub(mir_name, 5, -1), "-3p")))
@@ -151,8 +104,10 @@ getAllCounts <- function(id, align, sRNAreads, time, mirAnno = NULL, topn = 5, .
            tcReads = tcReads / sRNAreads * 1000000,
            lenDis = lenDis / sRNAreads * 1000000,
            tcLenDis = tcLenDis / sRNAreads * 1000000) %>%
-    dplyr::rename_(.dots = setNames(c("totalReads", "tcReads", "lenDis", "tcLenDis"),
-                                    c(totalRName, tcRName, totalLDname, tcLDname)))
+    dplyr::rename_(.dots = setNames(c("totalReads", "tcReads",
+                                      "lenDis", "tcLenDis"),
+                                    c(totalRName, tcRName,
+                                      totalLDname, tcLDname)))
 
   return(read.summary.topnPos)
 }
@@ -168,14 +123,16 @@ pileupParallelMuts <- function(groupedData, mc.param, minLen) {
   pos <- groupedData$pos
   mir.type <- groupedData$mir.type
 
-  doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, time = t, pos = pos,
-                    mir.type = mir.type, MoreArgs = list(bamFile = bF, minLen = minLen),
+  doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, time = t,
+                    pos = pos, mir.type = mir.type,
+                    MoreArgs = list(bamFile = bF, minLen = minLen),
                     SIMPLIFY = FALSE, BPPARAM = mc.param)
 
   return(dplyr::bind_rows(doOut))
 }
 
-doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLen) {
+doParallelPileup <- function(miR, timepoint, time, pos, mir.type,
+                             bamFile, minLen) {
   # This function will be called from dplyr do() in parallel using BiocParallel `bpmapply`
   # The function itself returns a cleaned data.frame of the pileup, which mapply wraps in a list
   # with one item for every bamFile.
@@ -185,14 +142,16 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
   start.pos <- pos
   end.pos <- start.pos + 30
 
-  pparam <- PileupParam(query_bins = seq(0,30), max_depth=50000000, min_mapq=0, min_base_quality=0)
-  sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = F),
+  pparam <- PileupParam(query_bins = seq(0,30), max_depth=50000000, min_mapq=0,
+                        min_base_quality=0)
+  sparam <- ScanBamParam(flag = scanBamFlag(isMinusStrand = FALSE),
                          which=GRanges(miR, IRanges(start.pos, end.pos)))
 
-  filterNs <- FilterRules(list(NoAmbigNucleotide = function(x) !grepl("N", x$seq)))
+  filterParam <- ScanBamParam(what = "seq",
+                              flag = scanBamFlag(isMinusStrand = FALSE))
+  filterNs <- FilterRules(list(NoAmbigNucs = function(x) !grepl("N", x$seq)))
   filterBam <- filterBam(bamFile, tempfile(),
-                         param = ScanBamParam(what = "seq",
-                                              flag = scanBamFlag(isMinusStrand = F)),
+                         param = filterParam,
                          filter = filterNs)
 
   pileupResult <- pileup(filterBam, scanBamParam = sparam, pileupParam = pparam)
@@ -201,7 +160,8 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type, bamFile, minLe
     pileupResult %>%
     dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
-           flybase_id = as.character(seqnames), # Coerce factor to character to avoid warning later on
+           # Coerce factor to character to avoid warning later on
+           flybase_id = as.character(seqnames),
            timepoint = timepoint,
            time = time,
            mir.type = mir.type,

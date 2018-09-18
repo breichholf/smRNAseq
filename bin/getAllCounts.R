@@ -35,27 +35,31 @@ idCount <- dim(ids)[1]
 #
 # Columns (per ID) -- all normalised to sRNAreads from cfg$samples:
 #  - tcLenDis.<libID>    tcReads.<libID>    totalLenDis.<libID>    totalReads.<libID>
-allCounts <- cfg$samples %>% pmap(getAllCounts, mirAnno = cfg$anno) %>% purrr::reduce(full_join)
+allCounts <-
+  cfg$samples %>%
+  pmap(getAllCounts, mirAnno = cfg$anno) %>%
+  purrr::reduce(full_join)
 
-allCounts %>% write_tsv('allCounts.tsv')
+allCounts %>% write_tsv("allCounts.tsv")
 
 # Long format of tcReads and totalReads - only 1 entry per starting position and miR name
 # In the wide format, there might be some lengths that are present in one timepoint but not the other.
-# When converting to long, these would be represented as NA in 'totalReads'. To get around that,
+# When converting to long, these would be represented as NA in "totalReads". To get around that,
 # we first convert NA to 0, select all unique entries and then sum up all reads.
 gatheredCounts <-
   allCounts %>%
-  select(-matches('LenDis')) %>%
+  select(-matches("LenDis")) %>%
   gather(type, reads, matches("Reads\\.")) %>%
   replace_na(list(reads = 0)) %>%
-  separate(type, c("read.type", "timepoint", "time"), sep = "\\.", convert = TRUE) %>%
+  separate(type, c("read.type", "timepoint", "time"),
+           sep = "\\.", convert = TRUE) %>%
   group_by(pos, flybase_id, read.type, timepoint) %>%
     select(-seqLen) %>% distinct() %>%
     mutate(readSum = sum(reads)) %>% select(-reads) %>% distinct() %>%
     dplyr::rename(reads = readSum) %>%
   ungroup()
 
-# Final filtering: we're only interested in miRs that have > 0 at any timepoint.
+# Final filtering: we"re only interested in miRs that have > 0 at any timepoint.
 nonZeroPos <-
   gatheredCounts %>%
   filter(read.type == "totalReads", reads != 0) %>%
@@ -83,7 +87,7 @@ gatheredCounts.gtZero <-
 # Filter length distributions
 gatheredLenDis <-
   allCounts %>%
-  select(-matches('Reads')) %>%
+  select(-matches("Reads")) %>%
   gather(type, reads, matches("LenDis")) %>%
   replace_na(list(reads = 0)) %>% distinct() %>%
   separate(type, c("LD.type", "timepoint", "time"), sep = "\\.", convert = TRUE)
@@ -94,5 +98,5 @@ gatheredLenDis.gtZero <-
   distinct()
 
 # Save all files -- there is no label yet which is mature and which is star!
-gatheredCounts.gtZero %>% write_tsv('filteredPositions.tsv')
-gatheredLenDis.gtZero %>% write_tsv('filteredLenDis.tsv')
+gatheredCounts.gtZero %>% write_tsv("filteredPositions.tsv")
+gatheredLenDis.gtZero %>% write_tsv("filteredLenDis.tsv")

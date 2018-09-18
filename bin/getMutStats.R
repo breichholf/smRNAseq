@@ -9,14 +9,14 @@ jsonFile <- as.character(args[4])
 posFile <- as.character(args[5])
 preMirFastaFile <- as.character(args[6])
 
-source(file.path(scriptDir, 'bin/functions.R'))
+source(file.path(scriptDir, "bin/functions.R"))
 
 setupRlibs(R_libs)
 
 # Packages loaded in setupRlibs
-#library(tidyverse)
-#library(Biostrings)
-#library(BiocParallel)
+# library(tidyverse)
+# library(Biostrings)
+# library(BiocParallel)
 
 sessionInfo()
 
@@ -25,7 +25,8 @@ cfg <- getcfg(jsonFile)
 mirPositions <- read_tsv(posFile)
 
 preMirFasta <- readDNAStringSet(preMirFastaFile)
-preMirTbl <- as_tibble(list('flybase_id' = names(preMirFasta), 'full.seq' = paste(preMirFasta)))
+preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta),
+                            "full.seq" = paste(preMirFasta)))
 
 mirBodyLength <- 30
 
@@ -35,36 +36,41 @@ maxHairpinLen <- max(str_length(preMirTbl$full.seq))
 # Create a tidy dataframe for one position per line, with its reference nucleotide
 tidyRefNucs <-
   preMirTbl %>%
-  separate(full.seq, paste('Pos', 1:maxHairpinLen, sep = '_'), sep = '\\B') %>%
-  gather(pos, refNuc, matches('Pos_')) %>% na.omit() %>%
-  separate(pos, c('pos', 'idx'), sep = '_', convert = TRUE) %>%
+  separate(full.seq, paste("Pos", 1:maxHairpinLen, sep = "_"), sep = "\\B") %>%
+  gather(pos, refNuc, matches("Pos_")) %>% na.omit() %>%
+  separate(pos, c("pos", "idx"), sep = "_", convert = TRUE) %>%
   dplyr::select(-pos)
 
 # Complete tibble with bamFiles, for effective do()
 mirPosWFiles <-
   mirPositions %>%
-  left_join(cfg$samples, by = c('timepoint' = 'id', 'time')) %>%
+  left_join(cfg$samples, by = c("timepoint" = "id", "time")) %>%
   mutate(bamFile = file.path(align)) %>%
   dplyr::filter(!is.na(align)) %>%
   left_join(preMirTbl) %>%
   dplyr::filter(average.ppm >= 5, read.type == "totalReads") %>%
   dplyr::rename(totalReads = reads)
 
-# This is a bit hackey, as on our cluster, the nCores provided is half what R can use by hyperthreading
+# This is a bit hackey, as on our cluster: nCores corresponds to the number of cores
+# we ask for, but we can use double with hyperthreading
 nProcs <- nCores * 2
-mc.param <- MulticoreParam(workers = nProcs, type = 'FORK')
+mc.param <- MulticoreParam(workers = nProcs, type = "FORK")
 
 # Parallel pileup for all miRs
 mirsWmuts <-
   mirPosWFiles %>%
   group_by(bamFile) %>%
-  do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param, minLen = mirBodyLength)) %>%
+  do(muts = pileupParallelMuts(groupedData = ., mc.param = mc.param,
+                               minLen = mirBodyLength)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
-  left_join(tidyRefNucs, by = c('flybase_id', 'pos' = 'idx')) %>%
-  left_join(mirPosWFiles %>% dplyr::select(-bamFile), by = c('flybase_id', 'timepoint', 'time', 'mir.type', 'start.pos' = 'pos'))
+  left_join(tidyRefNucs, by = c("flybase_id", "pos" = "idx")) %>%
+  left_join(mirPosWFiles %>%
+              dplyr::select(-bamFile),
+              by = c("flybase_id", "timepoint", "time",
+                     "mir.type", "start.pos" = "pos"))
 
-mirsWmuts %>% write_tsv('miRs.wAllMuts.tsv')
+mirsWmuts %>% write_tsv("miRs.wAllMuts.tsv")
 
 # Determine mutation code and fraction of bases mutated
 mirMutCodes <-
@@ -73,13 +79,14 @@ mirMutCodes <-
   replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
   gather(nucleotide, count, A:T) %>%
   mutate(mutCode = ifelse(refNuc != nucleotide,
-                          paste(refNuc, nucleotide, sep = '>'),
+                          paste(refNuc, nucleotide, sep = ">"),
                           refNuc)) %>%
   group_by(flybase_id, timepoint, pos, start.pos) %>%
     mutate(depth = sum(count), mutFract = count / depth) %>%
-    dplyr::filter(grepl('>', mutCode)) %>%
+    dplyr::filter(grepl(">", mutCode)) %>%
   ungroup() %>%
-  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type)
+  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`,
+                -align, -full.seq, -mir_name, -read.type)
 
 # Switch to wide format for smoother excel copy/paste
 mirMutsWide <-
@@ -89,10 +96,12 @@ mirMutsWide <-
            relMut = paste(mutCode, relMutCount, sep = "_"),
            relMut = str_replace(relMut, ">", "")) %>%
   ungroup() %>%
-  dplyr::select(flybase_id, arm.name, mir.type, start.pos, seed, UCount, timepoint, time, average.ppm, depth, mutFract, relMut) %>%
+  dplyr::select(flybase_id, arm.name, mir.type, start.pos, seed,
+                UCount, timepoint, time, average.ppm, depth,
+                mutFract, relMut) %>%
   spread(relMut, mutFract) %>%
   arrange(mir.type, desc(average.ppm), time)
 
 # Write out files
-mirMutCodes %>% write_tsv('mirMutCodes.tsv')
-mirMutsWide %>% write_tsv('mirMutsWide.tsv')
+mirMutCodes %>% write_tsv("mirMutCodes.tsv")
+mirMutsWide %>% write_tsv("mirMutsWide.tsv")

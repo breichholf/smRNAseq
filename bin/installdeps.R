@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
 
-source('functions.R')
+source("functions.R")
 
 setupRLibs()
