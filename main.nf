@@ -255,6 +255,8 @@ process trim_4N {
 /*
  * STEP 3: Align
  * Note: We use bowtie v1.2.2, but likely any aligner could be used
+ *       The most important feature is global alignment, to retain
+ *       mutations at the 5p and 3p interface
  */
 process bowtie_hairpins {
   tag "$trimmedReads"
