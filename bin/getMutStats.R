@@ -75,6 +75,7 @@ mirsWmuts %>% write_tsv("miRs.wAllMuts.tsv")
 # Determine mutation code and fraction of bases mutated
 mirMutCodes <-
   mirsWmuts %>%
+  dplyr::select(-align, -full.seq, -`5p`, -loop, -`3p`) %>%
   spread(nucleotide, count) %>%
   replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
   gather(nucleotide, count, A:T) %>%
@@ -85,8 +86,7 @@ mirMutCodes <-
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl(">", mutCode)) %>%
   ungroup() %>%
-  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`,
-                -align, -full.seq, -mir_name, -read.type)
+  dplyr::select(-refNuc, -nucleotide, -count, -mir_name, -read.type)
 
 # Switch to wide format for smoother excel copy/paste
 mirMutsWide <-
