@@ -91,6 +91,7 @@ mirMutCodes <-
 # Switch to wide format for smoother excel copy/paste
 mirMutsWide <-
   mirMutCodes %>%
+  dplyr::filter(relPos <= 18) %>%
   group_by(flybase_id, time, start.pos, mutCode) %>%
     mutate(relMutCount = sprintf("%02d", rank(relPos)),
            relMut = paste(mutCode, relMutCount, sep = "_"),
