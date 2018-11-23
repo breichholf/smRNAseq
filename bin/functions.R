@@ -30,10 +30,11 @@ getcfg <- function(json) {
   file.home <- cfg.info$base
   mir.anno <- read_tsv(cfg.info$mir.anno)
 
-  cfg.samples <- dplyr::bind_rows(cfg.info$samples)
-  cfg.samples <- mutate(cfg.samples, align = file.path(file.home, align))
+  cfg.samples <-
+    dplyr::bind_rows(cfg.info$samples) %>%
+    mutate(cfg.samples, align = file.path(file.home, align))
 
-  return(list("samples" = cfg.samples, "anno" = mir.anno))
+  list("samples" = cfg.samples, "anno" = mir.anno)
 }
 
 # 1) Reads bam
@@ -96,8 +97,8 @@ getAllCounts <- function(id, align, sRNAreads, time,
   tcLDname <- paste("tcLenDis", id, time, sep = ".")
 
   # Keep the `topn` (default: 5) most frequently used start positions
-  read.summary.topnPos <-
-    read.summary.closestArms %>%
+  # This will be returned
+  read.summary.closestArms %>%
     group_by(arm.name) %>%
     top_n(n = topn, wt = totalReads) %>% ungroup() %>%
     mutate(totalReads = totalReads / sRNAreads * 1000000,
@@ -108,8 +109,6 @@ getAllCounts <- function(id, align, sRNAreads, time,
                                       "lenDis", "tcLenDis"),
                                     c(totalRName, tcRName,
                                       totalLDname, tcLDname)))
-
-  return(read.summary.topnPos)
 }
 
 pileupParallelMuts <- function(groupedData, mc.param, minLen) {
@@ -123,12 +122,10 @@ pileupParallelMuts <- function(groupedData, mc.param, minLen) {
   pos <- groupedData$pos
   mir.type <- groupedData$mir.type
 
-  doOut <- bpmapply(doParallelPileup, miR = fbid, timepoint = tp, time = t,
-                    pos = pos, mir.type = mir.type,
-                    MoreArgs = list(bamFile = bF, minLen = minLen),
-                    SIMPLIFY = FALSE, BPPARAM = mc.param)
-
-  return(dplyr::bind_rows(doOut))
+  dplyr::bind_rows(bpmapply(doParallelPileup, miR = fbid, timepoint = tp,
+                            time = t, pos = pos, mir.type = mir.type,
+                            MoreArgs = list(bamFile = bF, minLen = minLen),
+                            SIMPLIFY = FALSE, BPPARAM = mc.param))
 }
 
 doParallelPileup <- function(miR, timepoint, time, pos, mir.type,
@@ -156,8 +153,8 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type,
 
   pileupResult <- pileup(filterBam, scanBamParam = sparam, pileupParam = pparam)
 
-  filteredRes <-
-    pileupResult %>%
+  # Return value
+  pileupResult %>%
     dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
            # Coerce factor to character to avoid warning later on
@@ -168,6 +165,4 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type,
            start.pos = start.pos) %>%
     dplyr::select(-seqnames, -query_bin) %>%
     dplyr::filter(relPos == pos - min(pos) + 1, relPos <= minLen)
-
-  return(filteredRes)
 }
