@@ -1,9 +1,9 @@
 library(tidyverse)
 
-filt.counts.File <- list('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/filteredPositions.tsv',
-                         '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/filteredPositions.tsv')
-filt.lendis.File <- list('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/filteredLenDis.tsv',
-                         '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/filteredLenDis.tsv')
+filt.counts.File <- list('/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/stats/filteredPositions.tsv',
+                         '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/pre2018-11/merged M5001 M5013/raw/filteredPositions.tsv')
+filt.lendis.File <- list('/Volumes/ameres/Reichholf/sequencing/20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/stats/filteredLenDis.tsv',
+                         '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/pre2018-11/merged M5001 M5013/raw/filteredLenDis.tsv')
 
 ltc.tp <- c(45493:45501)
 stc.tp <- c(56037:56047)
@@ -24,6 +24,7 @@ tp.count <- length(c(ltc.tp, stc.tp))
 # Finally, only keep these positions for joins
 final.filter.pos <-
   filt.counts %>%
+  filter(!grepl("2a|2b-1|13b-1|276b|281-1", arm.name)) %>%
   group_by(pos, arm.name, read.type) %>%
   mutate(libcount = n()) %>%
   filter(libcount == tp.count) %>%
@@ -40,19 +41,17 @@ final.filter.lendis <- final.filter.pos %>% left_join(filt.lendis) %>% mutate(re
 
 # We split all reads at time = 0 to tcReads and totalReads, to calculate the background ratio
 # This will be used as a cutoff for each length isoform
-bg.counts <- final.filter.counts %>% filter(time == 0)
+bg.counts <- final.filter.counts %>% filter(time == 0) %>% select(pos, flybase_id, arm.name, mir.type, experiment, read.type, reads)
 
 tc.bg.counts <-
   bg.counts %>%
   filter(read.type == "tcReads") %>%
-  select(pos, arm.name, experiment, reads) %>%
-  rename(tc.bg.reads = reads)
+  select(pos, arm.name, experiment, tc.bg.reads = reads)
 
 bg.ratio <-
   bg.counts %>%
   filter(read.type == "totalReads") %>%
-  select(pos, arm.name, experiment, reads) %>%
-  rename(stdy.state.reads = reads) %>%
+  select(pos, arm.name, experiment, stdy.state.reads = reads) %>%
   left_join(tc.bg.counts) %>%
   mutate(bg.ratio = tc.bg.reads / stdy.state.reads) %>%
   select(-stdy.state.reads, -tc.bg.reads)
@@ -60,27 +59,28 @@ bg.ratio <-
 # Apply cutoff to each timepoint
 lenDis.w.cutoffs <-
   final.filter.counts %>%
-  select(pos, flybase_id, mir_name, arm.name, read.type, mir.type, reads, experiment, timepoint) %>%
+  select(pos, flybase_id, mir_name, arm.name, mir.type, experiment, timepoint, time, read.type, reads) %>%
   spread(read.type, reads) %>%
   left_join(bg.ratio) %>%
   mutate(cutoff = bg.ratio * totalReads) %>%
   select(-bg.ratio) %>%
-  left_join(final.filter.lendis) %>%
-  select(-`5p`, -`3p`)
+  left_join(final.filter.lendis)
 
-# Only keep reads of length isoforms > cutoff + 1e5 to avoid issues with floats
+# Only keep reads of length isoforms > cutoff + 1e-7 to avoid issues with floats
 lendis.cutoff.filtered <-
   lenDis.w.cutoffs %>%
-  mutate(reads.filtered = ifelse(LD.type == "totalLenDis", reads,
-                                 ifelse(reads > cutoff + 1e-7, reads, 0))) # if LD.type == "tcLenDis"
+  mutate(reads.filtered = ifelse(LD.type == "tcLenDis",
+                                 ifelse(reads > cutoff + 1e-7, reads, 0),
+                                 reads))
 
 # Short timecourse
-short.mutsF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/miRs.wAllMuts.tsv'
+short.mutsF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/pre2018-11/merged M5001 M5013/raw/miRs.wAllMuts.tsv'
 short.muts <- read_tsv(short.mutsF)
 
 short.muts.wFracts <-
   short.muts %>%
-  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
+  filter(!grepl("2a|2b-1|13b-1|276b|281-1", arm.name)) %>%
+  dplyr::select(-align, -full.seq, -(`5p`:`3p`)) %>%
   spread(nucleotide, count) %>%
   replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
   gather(nucleotide, count, A:T) %>%
@@ -91,7 +91,7 @@ short.muts.wFracts <-
   mutate(depth = sum(count), mutFract = count / depth) %>%
   dplyr::filter(grepl('>', mutCode)) %>%
   ungroup() %>%
-  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type, -depth, -miRNAreads)
+  dplyr::select(-refNuc, -nucleotide, -count, -mir_name, -read.type)
 
 short.bg.muts <-
   short.muts.wFracts %>%
@@ -122,14 +122,16 @@ short.tc.only %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M
 
 # Long Timecourse
 # First, we need to estimate labelling efficiency. To do this, we load the mutation file
-mutsF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M3987 M4134/raw/miRs.wAllMuts.tsv'
-mutsSF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/merged M5001 M5013/raw/miRs.wAllMuts.tsv'
-muts <- dplyr::bind_rows(read_tsv(mutsF), read_tsv(mutsSF))
+mutsF <- '/Volumes/ameres/Reichholf/sequencing/20161102_Ago2KO_slam-pulse/align/nextflow/results/stats/miRs.wAllMuts.tsv'
+mutsSF <- '~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/pre2018-11/merged M5001 M5013/raw/miRs.wAllMuts.tsv'
+#muts <- dplyr::bind_rows(read_tsv(mutsF), read_tsv(mutsSF))
+muts <- read_tsv(mutsF)
 
 
 muts.wFracts <-
   muts %>%
-  filter(!grepl("2a", arm.name), !grepl("2b-1", arm.name), !grepl("13b-1", arm.name), !grepl("276b", arm.name)) %>%
+  filter(!grepl("2a|2b-1|13b-1|276b|281-1", arm.name)) %>%
+  dplyr::select(-align, -full.seq, -(`5p`:`3p`)) %>%
   spread(nucleotide, count) %>%
   replace_na(list(A = 0, C = 0, G = 0, T = 0)) %>%
   gather(nucleotide, count, A:T) %>%
@@ -141,16 +143,16 @@ muts.wFracts <-
   dplyr::filter(grepl('>', mutCode)) %>%
   ungroup() %>%
   left_join(expDF) %>%
-  dplyr::select(-refNuc, -nucleotide, -count, -`5p`, -`3p`, -align, -full.seq, -mir_name, -read.type, -depth, -miRNAreads)
+  dplyr::select(-refNuc, -nucleotide, -count, -mir_name, -read.type)
 
 bg.muts <-
   muts.wFracts %>%
   filter(time == 0) %>%
-  dplyr::rename(bg.mut = mutFract) %>%
-  select(pos, relPos, flybase_id, start.pos, experiment, mutCode, bg.mut)
+  select(pos, relPos, flybase_id, start.pos, experiment, mutCode, bg.mut = mutFract)
 
 muts.noBG <-
   muts.wFracts %>%
+  filter(relPos <= 18) %>%
   left_join(bg.muts) %>%
   mutate(bg.minus.mut = ifelse(mutFract > bg.mut + 1e-7, mutFract - bg.mut, 0)) %>%
   select(-mutFract, -bg.mut) %>%
@@ -159,12 +161,12 @@ muts.noBG <-
 tc.only <-
   muts.noBG %>%
   filter(grepl("T>", mutCode)) %>%
-  group_by(flybase_id, time, start.pos, mutCode) %>%
-  mutate(relMutCount = sprintf("%02d", rank(relPos)),
+  group_by(flybase_id, time, start.pos, mutCode, experiment) %>%
+  mutate(relMutCount = sprintf("%02d", as.integer(rank(relPos))),
          relMut = paste(mutCode, relMutCount, sep = "_"),
          relMut = str_replace(relMut, ">", "")) %>%
   ungroup() %>%
-  dplyr::select(arm.name, mir.type, mir.type, start.pos, seed, UCount, timepoint, time, average.ppm, bg.minus.mut, relMut) %>%
+  dplyr::select(arm.name, mir.type, mir.type, start.pos, seed, UCount, experiment, timepoint, time, average.ppm, bg.minus.mut, relMut) %>%
   spread(relMut, bg.minus.mut) %>%
   arrange(mir.type, desc(average.ppm))
 
@@ -218,14 +220,17 @@ fits <-
   muts.noBG %>%
   filter(mutCode == "T>C") %>%
   # mutate(time = time / 60) %>%
-  group_by(flybase_id, start.pos) %>%
-  do(fit.one = nlsLM(bg.minus.mut ~ Plat * (1 - exp(-k * time)),
-                     start = list(Plat = 1, k = 0.5),
-                     upper = c(Inf, Inf), lower = c(0, 0),
-                     control = nls.lm.control(maxiter = 1000),
-                     na.action = na.omit, data = .),
+  group_by(flybase_id, start.pos, experiment) %>%
+  do(fit.one = tryCatch(nlsLM(bg.minus.mut ~ Plat * (1 - exp(-k * time)),
+                              start = list(Plat = 0.05, k = 0.5),
+                              upper = c(Inf, Inf), lower = c(0, 0),
+                              control = nls.lm.control(maxiter = 1000),
+                              na.action = na.omit, data = .),
+                        error = function(err) {
+                          return(NULL)
+                        }),
      fit.two = tryCatch(wrapnlsr(bg.minus.mut ~ (Plat * pFast * 0.01) * (1 - exp(-kFast * time)) + (Plat * (100 - pFast) * 0.01) * (1 - exp(-kSlow * time)),
-                                 start = list(Plat = 0.1, kFast = 0.65194720, kSlow = 0.43463147, pFast = 50),
+                                 start = list(Plat = 0.05, kFast = 0.01, kSlow = 0.001, pFast = 50),
                                  lower = c(0, 0, 0, 0), upper = c(Inf, Inf, Inf, 100),
                                  trace = FALSE,
                                  data = .),
@@ -238,7 +243,7 @@ fits <-
 maxmut <-
   muts.noBG %>%
   filter(mutCode == "T>C", time == 1440) %>%
-  group_by(flybase_id, start.pos) %>%
+  group_by(flybase_id, start.pos, experiment) %>%
   mutate(mean.mut = mean(bg.minus.mut), lab.norm.mut = top.plateau / mean.mut) %>%
   select(flybase_id:average.ppm, mean.mut, lab.norm.mut) %>%
   select(-time, -timepoint) %>%
@@ -252,17 +257,20 @@ fits <-
   # mutate(avg.mut = mean(bg.minus.mut)) %>%
   # select(-bg.minus.mut, -relPos, -pos) %>%
   # distinct() %>% arrange(mir.type, desc(average.ppm))
-  group_by(flybase_id, start.pos) %>%
-  do(fit.one = nlsLM(bg.minus.mut ~ Plat * (1 - exp(-k * time)),
-                     start = list(Plat = 1, k = 0.5),
-                     upper = c(Inf, Inf), lower = c(0, 0),
-                     control = nls.lm.control(maxiter = 1000),
-                     na.action = na.omit, data = .),
+  group_by(flybase_id, arm.name, mir.type, average.ppm, start.pos) %>%
+  do(fit.one = tryCatch(nlsLM(bg.minus.mut ~ Plat * (1 - exp(-k * time)),
+                              start = list(Plat = 1, k = 0.5),
+                              upper = c(Inf, Inf), lower = c(0, 0),
+                              control = nls.lm.control(maxiter = 1000),
+                              na.action = na.omit, data = .),
+                        error = function(err) {
+                          return(NULL)
+                        }),
      fit.two = tryCatch(wrapnlsr(bg.minus.mut ~ (Plat * pFast * 0.01) * (1 - exp(-kFast * time)) + (Plat * (100 - pFast) * 0.01) * (1 - exp(-kSlow * time)),
-                                 start = list(Plat = 0.1, kFast = 0.65194720, kSlow = 0.43463147, pFast = 50),
-                                 lower = c(0, 0, 0, 0), upper = c(Inf, Inf, Inf, 100),
-                                 trace = FALSE,
-                                 data = .),
+                              start = list(Plat = 0.1, kFast = 0.65194720, kSlow = 0.43463147, pFast = 50),
+                              lower = c(0, 0, 0, 0), upper = c(Inf, Inf, Inf, 100),
+                              trace = FALSE,
+                              data = .),
                         error = function(err) {
                           return(NULL)
                         }))
@@ -1143,3 +1151,4 @@ mut.single.ppm.spread <-
   arrange(mir.type, desc(exp.ppm))
 
 mut.single.ppm.spread %>% write_tsv('~/Dropbox/PhD/data/sRNA SLAMseq REANALYSED/M3987 - Ago2KO 24h R1/raw/rep1_2_side-by-side.kbio.tsv')
+
