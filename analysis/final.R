@@ -15,7 +15,9 @@ ago1_ip_folder <- paste0(baseFolder, "20170417_ago2ko-ago1ip-r2/merged_nf_1811_r
 col_input_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/01_input/stats")
 col_ago_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/02_ago-frac/stats")
 col_salt_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/03_high-salt")
-
+merged_tcFolder <- paste0(baseFolder, "20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/tcCounts")
+unox_tcFolder <- paste0(baseFolder, "20160419_S2_3h-xChg_OxUnOx_pulse-chase/nextflow/1811_rerun/tcCounts")
+merged_tailFolder <- paste0(baseFolder, "20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/tailstats")
 
 filtPosFiles <- function(x) {return(paste0(x, "/filteredPositions.tsv"))}
 filtLenDisFiles <- function(x) {return(paste0(x, "/filteredLenDis.tsv"))}
@@ -27,20 +29,28 @@ file_list <- c(rep1_folder, rep2_folder, merged_folder, ox_folder, unox_folder, 
 experiment_types <- c("ago2ko-rep1", "ago2ko-rep2", "ago2ko-merge", "wt-ox", "wt-unox", "ago1-ip-merge",
                       "column-input", "column-ago-fract")
 
-# filt.counts.File <- as_tibble(list("file" = c(paste0(rep1_folder, "/filteredPositions.tsv"),
-#                                               paste0(rep2_folder, "/filteredPositions.tsv"),
-#                                               paste0(merged_folder, "/filteredPositions.tsv"),
-#                                               paste0(ox_folder, "/filteredPositions.tsv"),
-#                                               paste0(unox_folder, "/filteredPositions.tsv"),
-#                                               paste0(ago1_ip_folder, "/filteredPositions.tsv")),
-#                                    "type" = c("ago2ko-rep1", "ago2ko-rep2", "ago2ko-merge",
-#                                               "wt-ox", "wt-unox", "ago1-ip-merge")))
 filt.counts.File <- as_tibble(list("file" = unlist(lapply(file_list, filtPosFiles)),
                                    "type" = experiment_types))
 filt.lendis.File  <- as_tibble(list("file" = unlist(lapply(file_list, filtLenDisFiles)),
                                     "type" = experiment_types))
 muts.File <- as_tibble(list("file" = unlist(lapply(file_list, mutFiles)),
                             "type" = experiment_types))
+
+tcCount.Files <-
+  as_tibble(list("file" = c(list.files(path = merged_tcFolder, pattern = "tcCount.txt", full.names = TRUE),
+                            list.files(path = unox_tcFolder, pattern = "tcCount.txt", full.names = TRUE)))) %>%
+  mutate(timepoint = as.numeric(str_sub(basename(file), 1, 5)),
+         experiment = ifelse(between(timepoint, 45493, 45501),
+                             "ago2ko-merge",
+                             "wt-unox"))
+
+tail.Files <-
+  as_tibble(list("file" = c(list.files(path = merged_tailFolder, pattern = "ALLtail-info.txt", full.names = TRUE),
+                            list.files(path = merged_tailFolder, pattern = "TC-only_tail-info.txt", full.names = TRUE),
+                            list.files(path = merged_tailFolder, pattern = "TC-newbody-only_tail-info.txt", full.names = TRUE)))) %>%
+  mutate(tail.type = case_when(str_sub(basename(file), 7, 13) == "ALLtail" ~ "all",
+                               str_sub(basename(file), 7, 13) == "TC-only" ~ "tc.reads",
+                               str_sub(basename(file), 7, 13) == "TC-newb" ~ "tc.new"))
 
 rep1_tp <- c(45493:45501)
 rep2_tp <- c(47117:47125)
@@ -62,8 +72,28 @@ expDF <-
                                   rep("column-ago-fract", length(col_ago_tp))),
                  "timepoint" = c(rep1_tp, rep2_tp, merge_tp, ox_tp, unox_tp, ago1_ip_tp,
                                  col_input_tp, col_ago_tp)))
+
 readFiles <- function(file, type) { read_tsv(file) %>% mutate(experiment = type) }
 
+readTcFiles <- function(file, experiment, ...) {
+  cols <- c("timepoint", "arm.name", "pos", "tcReads.1.TC", "tcReads.2.TC", "tcReads.3.TC")
+  read_tsv(file, col_names = cols) %>%
+    mutate(experiment = experiment)
+}
+
+readTailFiles <- function(file, tail.type, ...) {
+  cols <- c("timepoint", "arm.name", "pos", "tail.member", "tail", "tail.count",
+            "total.tails", "seq.count")
+  read_tsv(file, col_names = cols) %>%
+    mutate(tail.type = tail.type)
+}
+
+readNewTailFiles <- function(file, tail.type, ...) {
+  cols <- c("timepoint", "arm.name", "pos", "tail.member", "tail", "tail.start",
+            "tail.count", "total.tails", "seq.count")
+  read_tsv(file, col_names = cols) %>%
+    mutate(tail.type = tail.type)
+}
 
 filt.counts <-
   filt.counts.File %>%
@@ -75,6 +105,23 @@ filt.lendis <-
   purrr::pmap(readFiles) %>%
   purrr::reduce(bind_rows) %>%
   select(-(`5p`:`3p`))
+
+tcCounts <-
+  tcCount.Files %>%
+  purrr::pmap(readTcFiles) %>%
+  purrr::reduce(bind_rows)
+
+tailInfo <-
+  tail.Files %>%
+  filter(tail.type != "tc.new") %>%
+  purrr::pmap(readTailFiles) %>%
+  purrr::reduce(bind_rows)
+
+newTailInfo <-
+  tail.Files %>%
+  filter(tail.type == "tc.new") %>%
+  purrr::pmap(readNewTailFiles) %>%
+  purrr::reduce(bind_rows)
 
 # We're only filtering for miRs that we know will cause troubles down the line
 # Also taking out 'wt-ox' for overlapping positions, as this experimentally is
@@ -670,6 +717,66 @@ seqLen.bg.norm %>%
   arrange(mir.type, desc(ago2ko.m.ppm)) %>%
   write_tsv(paste0(baseOutput, "/Fig4/background_subtracted_new/raw/Fig4D_wavg-len.tsv"))
 
+pooled.early <-
+  seqLen.bg.norm %>%
+  filter(grepl("ago2ko", experiment), between(time, 5, 60)) %>%
+  gather(ld, read.val, c("totalLenDis", "bg.minus")) %>%
+  mutate(ld = recode(ld, "totalLenDis" = "sstate", "bg.minus" = "tc"),
+         exptype = str_sub(experiment, 8, 11)) %>%
+  group_by(flybase_id, arm.name, pos, experiment, exptype, average.ppm, ld, duplex, seqLen) %>%
+  summarise(ld.sum = sum(read.val))
+
+wavg.lens.plus.isohet <-
+  pooled.early %>%
+  group_by(flybase_id, arm.name, pos, experiment, exptype, average.ppm, ld) %>%
+  mutate(maxLen = ifelse(ld.sum == max(ld.sum), seqLen, 0),
+         relLen = abs(seqLen - max(maxLen))) %>%
+  summarise(isohet = weighted.mean(relLen, ld.sum),
+            w.avg.len = weighted.mean(seqLen, ld.sum)) %>%
+  mutate(timepoint = 0, time = 0) %>%
+  bind_rows(seqLen.bg.norm %>%
+              filter(grepl("ago2ko", experiment)) %>%
+              gather(ld, read.val, c("totalLenDis", "bg.minus")) %>%
+              mutate(ld = recode(ld, "totalLenDis" = "sstate", "bg.minus" = "tc"),
+                     exptype = str_sub(experiment, 8, 11)) %>%
+              group_by(flybase_id, arm.name, pos, experiment, exptype,
+                       average.ppm, ld, timepoint, time) %>%
+              mutate(maxLen = ifelse(read.val == max(read.val), seqLen, 0),
+                     relLen = abs(seqLen - max(maxLen))) %>%
+              summarise(isohet = weighted.mean(relLen, read.val),
+                        w.avg.len = weighted.mean(seqLen, read.val))) %>%
+  ungroup() %>%
+  unite(wavg, ld, exptype, timepoint, time, sep = ".") %>%
+  select(-average.ppm) %>%
+  left_join(seqLen.bg.norm.sumppm %>%
+              filter(grepl("ago2ko", experiment)) %>%
+              select(flybase_id, arm.name, pos, experiment, average.ppm) %>%
+              distinct() %>%
+              spread(experiment, average.ppm)) %>%
+  left_join(seqLen.bg.norm.sumppm %>%
+              filter(experiment == "ago2ko-merge") %>%
+              select(pos, arm.name, flybase_id, mir.type) %>%
+              distinct()) %>%
+  select(-experiment)
+
+wavg.lens.plus.isohet %>%
+  select(-isohet) %>%
+  spread(wavg, w.avg.len) %>%
+  left_join(wavg.lens.plus.isohet %>%
+              select(-w.avg.len) %>%
+              mutate(wavg = paste0("isohet.3p.", wavg)) %>%
+              spread(wavg, isohet)) %>%
+  select(flybase_id, arm.name, pos, mir.type, ago2ko.r1.ppm = `ago2ko-rep1`,
+         ago2ko.r2.ppm = `ago2ko-rep2`, ago2ko.m.ppm = `ago2ko-merge`, everything()) %>%
+  arrange(mir.type, desc(ago2ko.m.ppm)) %>%
+  write_tsv(paste0(baseOutput, "/Fig4/background_subtracted_new/raw/Fig4D_wavg-len_isohet_merged-early.tsv"))
+
+pooled.early %>%
+  group_by(flybase_id, arm.name, pos, experiment, exptype, average.ppm, ld) %>%
+  mutate(maxLen = ifelse(ld.sum == max(ld.sum), seqLen, 0),
+         relLen = abs(seqLen - max(maxLen))) %>%
+  summarise(isohet = weighted.mean(relLen, ld.sum))
+
 ## Figure 5
 
 mir.hl.onePhase <-
@@ -684,7 +791,8 @@ mir.hl.onePhase <-
 
 mir.hl.twoPhase <-
   mirs.wExpFits %>%
-  filter(fit.select == "two.phase", !is.null(fit.two), !is.na(average.ppm)) %>%
+  # No clue why NULL value was coerced to character "NULL" here.
+  filter(fit.select == "two.phase", fit.one != "NULL", fit.two != "NULL", !is.na(average.ppm)) %>%
   rowwise() %>% tidy(fit.two) %>%
   filter(term == "kFast" | term == "kSlow") %>%
   ungroup() %>%
@@ -887,6 +995,21 @@ ox.unox.ppm %>%
          `tc.frac.a2k-mrg.720`, `tc.frac.a2k-mrg.1440`) %>%
   write_tsv(paste0(baseOutput, "/Fig6/raw/Fig6_ox.unox.ratio_tc.maxNorm.tsv"))
 
+mir.hl.onePhase %>%
+  left_join(mir.meta) %>%
+  filter(experiment == "ago2ko-merge") %>%
+  select(-fit.select, -k) %>%
+  mutate(experiment = str_replace(experiment, "ago2ko-", "hl.")) %>%
+  spread(experiment, hl.h) %>%
+  left_join(mir.hl.onePhase %>%
+              left_join(mir.meta) %>%
+              filter(experiment == "wt-ox") %>%
+              select(-fit.select, -k) %>%
+              mutate(experiment = str_replace(experiment, "wt-", "hl.wt.")) %>%
+              rename(ox.ppm = average.ppm) %>%
+              spread(experiment, hl.h)) %>%
+  write_tsv(paste0(baseOutput, "/Fig6/raw/Fig6G_ago2ko-ox_half-lives.tsv"))
+
 ox.unox.ppm %>%
   filter(!is.na(ox.unox.ratio)) %>%
   left_join(muts.bg.maxNorm.tidy %>%
@@ -931,6 +1054,19 @@ ox.unox.ppm %>%
 # S2B and C: abundance 
 
 ## Figure S3
+# We will grab the correlation of time-experiment-timepoint from final.filter.counts
+# Simply because it's small and will be processed quickly
+
+tcCounts %>%
+  filter(!grepl("2a|2b-1|13b-1|276b|281-1", arm.name)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  left_join(mir.meta) %>%
+  filter(!is.na(flybase_id)) %>%
+  select(flybase_id, arm.name, pos, mir.type, UCount, seed, experiment, timepoint, time,
+         average.ppm, tcReads.1.TC, tcReads.2.TC, tcReads.3.TC) %>%
+  write_tsv(paste0(baseOutput, "/FigS3/raw/FigS3_wt-unox_ago2ko_tcRead-TCcount.tsv"))
 
 ## Figure S4
 # From wt-unox experiment
@@ -963,5 +1099,220 @@ muts.wFracts %>%
   write_tsv(paste0(baseOutput, "/FigS4/raw/FigS4_unox_ppm_tc-fracs.tsv"))
 
 ## Figure S5
+# Replicate data from Fig2C
 
 ## Figure S6
+# NorthernBlot
+
+## Figure ??
+# Tailing
+
+# Tails that DO NOT start with T>C mutation: tail.member == "NoTC"
+# from reads that have T>C in the body: tail.type == "tc.reads"
+tailInfo %>%
+  filter(tail.type == "tc.reads", tail.member == "NoTC") %>%
+  mutate(tail.nuc.A = str_count(tail, "A"),
+         tail.nuc.C = str_count(tail, "C"),
+         tail.nuc.G = str_count(tail, "G"),
+         tail.nuc.T = str_count(tail, "T"),
+         frac.tailed = total.tails / seq.count) %>%
+  gather(col, nuc.count, starts_with("tail.nuc")) %>%
+  mutate(col = str_replace(col, "tail.nuc", "tail_nuc")) %>%
+  separate(col, c("col", "nuc"), sep = "\\.") %>% 
+  right_join(mir.meta %>%
+               filter(experiment == "ago2ko-merge")) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  filter(average.ppm >= 100) %>% 
+  group_by(timepoint, time, nuc) %>%
+  summarise(total.nucs = sum(nuc.count)) %>% 
+  mutate(frac.nuc = total.nucs / sum(total.nucs)) %>%
+  select(-total.nucs) %>%
+  spread(nuc, frac.nuc)
+
+bgTail <-
+  tailInfo %>%
+  filter(tail.type == "all", tail.member == "NoTC", timepoint == 45493) %>%
+  mutate(tail.nuc.A = str_count(tail, "A") * tail.count,
+         tail.nuc.C = str_count(tail, "C") * tail.count,
+         tail.nuc.G = str_count(tail, "G") * tail.count,
+         tail.nuc.T = str_count(tail, "T") * tail.count,
+         frac.tailed = total.tails / seq.count) %>%
+  group_by(timepoint, arm.name, pos, frac.tailed) %>%
+  summarise(tail.sum.A = sum(tail.nuc.A),
+            tail.sum.C = sum(tail.nuc.C),
+            tail.sum.G = sum(tail.nuc.G),
+            tail.sum.T = sum(tail.nuc.T)) %>%
+  right_join(mir.meta %>% filter(experiment == "ago2ko-merge")) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  ungroup() %>%
+  mutate(time = -1)
+
+tailInfo %>%
+  filter(tail.type == "tc.reads", tail.member == "NoTC") %>%
+  mutate(tail.nuc.A = str_count(tail, "A") * tail.count,
+         tail.nuc.C = str_count(tail, "C") * tail.count,
+         tail.nuc.G = str_count(tail, "G") * tail.count,
+         tail.nuc.T = str_count(tail, "T") * tail.count,
+         frac.tailed = total.tails / seq.count) %>%
+  group_by(timepoint, arm.name, pos, frac.tailed) %>%
+  summarise(tail.sum.A = sum(tail.nuc.A),
+            tail.sum.C = sum(tail.nuc.C),
+            tail.sum.G = sum(tail.nuc.G),
+            tail.sum.T = sum(tail.nuc.T)) %>%
+  right_join(mir.meta %>% filter(experiment == "ago2ko-merge")) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  ungroup() %>%
+  bind_rows(bgTail) %>%
+  select(flybase_id, arm.name, pos, mir.type, UCount, seed, timepoint, time, experiment, average.ppm,
+         frac.tailed, tail.sum.A, tail.sum.C, tail.sum.G, tail.sum.T) %>%
+  arrange(mir.type, desc(average.ppm), time) %>%
+  write_tsv(paste0(baseOutput, "/Fig4/tailing/raw/Fig4_ago2ko_tailing.tsv"))
+  
+  # gather(col, nuc.count, starts_with("tail.nuc")) %>%
+  # mutate(col = str_replace(col, "tail.nuc", "tail_nuc")) %>%
+  # separate(col, c("col", "nuc"), sep = "\\.") %>% 
+  # right_join(mir.meta %>%
+  #              filter(experiment == "ago2ko-merge")) %>%
+  # filter(!is.na(timepoint)) %>%
+  # left_join(final.filter.counts %>%
+  #             select(time, experiment, timepoint) %>%
+  #             distinct()) %>%
+  # filter(average.ppm >= 100) %>% 
+  # group_by(timepoint, time, nuc) %>%
+  # summarise(total.nucs = sum(nuc.count)) %>% 
+  # mutate(frac.nuc = total.nucs / sum(total.nucs)) %>%
+  # select(-total.nucs) %>%
+  # spread(nuc, frac.nuc)
+
+tailInfo %>%
+  filter(tail.type == "tc.reads", tail.member == "NoTC") %>%
+  mutate(tail.nuc.A = str_count(tail, "A"),
+         tail.nuc.C = str_count(tail, "C"),
+         tail.nuc.G = str_count(tail, "G"),
+         tail.nuc.T = str_count(tail, "T"),
+         frac.tailed = total.tails / seq.count,
+         tail.len = str_length(tail)) %>%
+  group_by(timepoint, arm.name, pos, frac.tailed, tail.len) %>%
+  summarise(total.tails = max(total.tails),
+            single.tails = sum(tail.count)) %>%
+  mutate(tail.col = paste0("tail_len.", tail.len)) %>%
+  right_join(mir.meta %>%
+               filter(experiment == "ago2ko-merge")) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  filter(average.ppm >= 100) %>%
+  mutate(single.nuc.tails = single.tails / total.tails,
+         avg.tail.len = weighted.mean(tail.len, single.tails)) %>%
+  select(-tail.len, -single.tails) %>% spread(tail.col, single.nuc.tails) %>%
+  arrange(mir.type, desc(average.ppm), time)
+
+bgNewTail <-
+  tailInfo %>%
+  filter(tail.type == "all", tail.member == "NoTC", timepoint == 45493) %>%
+  mutate(tail.nuc.A = str_count(tail, "A") * tail.count,
+         tail.nuc.C = str_count(tail, "C") * tail.count,
+         tail.nuc.G = str_count(tail, "G") * tail.count,
+         tail.nuc.T = str_count(tail, "T") * tail.count,
+         frac.tailed = total.tails / seq.count) %>%
+  group_by(timepoint, arm.name, pos, frac.tailed) %>%
+  summarise(tail.sum.A = sum(tail.nuc.A),
+            tail.sum.C = sum(tail.nuc.C),
+            tail.sum.G = sum(tail.nuc.G),
+            tail.sum.T = sum(tail.nuc.T)) %>%
+  right_join(mir.meta %>% filter(experiment == "ago2ko-merge")) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  ungroup() %>%
+  mutate(time = -1)
+
+sRNAreads <-
+  muts %>%
+  select(timepoint, time, experiment, sRNAreads) %>%
+  distinct()
+
+pooled.sRNAreads <-
+  sRNAreads %>%
+  filter(experiment == "ago2ko-merge", between(timepoint, 45494, 45497)) %>%
+  summarise(sRNAreads = sum(sRNAreads)) %>% .$sRNAreads
+
+sRNAreads.for.tails <-
+  sRNAreads %>%
+  filter(experiment == "ago2ko-merge") %>%
+  mutate(sRNAreads = ifelse(timepoint == 45497, pooled.sRNAreads, sRNAreads))
+
+reads.per.miR <-
+  filt.counts %>%
+  filter(read.type == "tcReads", experiment == "ago2ko-merge") %>%
+  select(flybase_id, arm.name, pos, experiment, timepoint, time, ppm = reads) %>%
+  left_join(sRNAreads) %>%
+  mutate(reads = ppm / 1000000 * sRNAreads)
+
+reads.per.miR.pooled <-
+  reads.per.miR %>%
+  filter(between(timepoint, 45494, 45497)) %>%
+  group_by(arm.name, pos) %>%
+  mutate(read.sum = sum(reads),
+         sRNAreads = sum(sRNAreads)) %>%
+  ungroup() %>%
+  filter(timepoint == 45497) %>%
+  select(flybase_id, arm.name, pos, experiment, timepoint, sRNAreads, reads = read.sum)
+
+reads.per.miR.total <-
+  reads.per.miR %>%
+  filter(timepoint > 45497) %>%
+  bind_rows(filt.counts %>%
+              filter(read.type == "totalReads", experiment == "ago2ko-merge", timepoint == 45493) %>%
+              select(flybase_id, arm.name, pos, experiment, timepoint, time, ppm = reads) %>%
+              left_join(sRNAreads) %>%
+              mutate(reads = ppm / 1000000 * sRNAreads)) %>%
+  select(flybase_id, arm.name, pos, experiment, timepoint, sRNAreads, reads) %>%
+  bind_rows(reads.per.miR.pooled) %>%
+  mutate(ppm = reads / sRNAreads * 1000000) %>%
+  arrange(arm.name, pos, timepoint)
+
+newTailInfo %>%
+  filter(tail.type == "tc.new", tail.member == "NoTC") %>%
+  mutate(tail.nuc.A = str_count(tail, "A") * tail.count,
+         tail.nuc.C = str_count(tail, "C") * tail.count,
+         tail.nuc.G = str_count(tail, "G") * tail.count,
+         tail.nuc.T = str_count(tail, "T") * tail.count,
+         frac.tailed = total.tails / seq.count) %>%
+  group_by(timepoint, arm.name, pos, frac.tailed) %>%
+  summarise(tail.sum.A = sum(tail.nuc.A),
+            tail.sum.C = sum(tail.nuc.C),
+            tail.sum.G = sum(tail.nuc.G),
+            tail.sum.T = sum(tail.nuc.T)) %>%
+  right_join(mir.meta %>% filter(experiment == "ago2ko-merge")) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(final.filter.counts %>%
+              select(time, experiment, timepoint) %>%
+              distinct()) %>%
+  ungroup() %>%
+  bind_rows(bgTail) %>%
+  left_join(reads.per.miR.total) %>%
+  mutate(tail.ppm = ppm * frac.tailed) %>%
+  group_by(arm.name, pos) %>%
+  mutate(min.tail = min(tail.ppm)) %>%
+  ungroup() %>%
+  select(flybase_id, arm.name, pos, mir.type, UCount, seed, timepoint, time, experiment, average.ppm,
+         frac.tailed, tail.ppm, sRNAreads, std.state.reads = reads, std.state.ppm = ppm, min.tail,
+         tail.sum.A, tail.sum.C, tail.sum.G, tail.sum.T) %>%
+  arrange(mir.type, desc(average.ppm), time) %>%
+  mutate(tail.frac.A = tail.sum.A / (tail.sum.A + tail.sum.C + tail.sum.G + tail.sum.T),
+         tial.frac.C = tail.sum.C / (tail.sum.A + tail.sum.C + tail.sum.G + tail.sum.T),
+         tial.frac.G = tail.sum.G / (tail.sum.A + tail.sum.C + tail.sum.G + tail.sum.T),
+         tial.frac.T = tail.sum.T / (tail.sum.A + tail.sum.C + tail.sum.G + tail.sum.T)) %>%
+  write_tsv(paste0(baseOutput, "/Fig4/tailing/raw/Fig4_ago2ko_tailing_merged-early.tsv"))
