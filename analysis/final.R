@@ -1,3 +1,4 @@
+library(Biostrings)
 library(tidyverse)
 library(broom)
 library(minpack.lm)
@@ -14,7 +15,7 @@ unox_folder <- paste0(baseFolder, "20160419_S2_3h-xChg_OxUnOx_pulse-chase/nextfl
 ago1_ip_folder <- paste0(baseFolder, "20170417_ago2ko-ago1ip-r2/merged_nf_1811_rerun/stats")
 col_input_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/01_input/stats")
 col_ago_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/02_ago-frac/stats")
-col_salt_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/03_high-salt")
+col_salt_folder <- paste0(baseFolder, "20180522_S2_Ago2KO_column-input_R1_R2/1811_nextflow/03_high-salt/stats")
 merged_tcFolder <- paste0(baseFolder, "20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/tcCounts")
 unox_tcFolder <- paste0(baseFolder, "20160419_S2_3h-xChg_OxUnOx_pulse-chase/nextflow/1811_rerun/tcCounts")
 merged_tailFolder <- paste0(baseFolder, "20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/tailstats")
@@ -24,10 +25,10 @@ filtLenDisFiles <- function(x) {return(paste0(x, "/filteredLenDis.tsv"))}
 mutFiles <- function(x) {return(paste0(x, "/miRs.wAllMuts.tsv"))}
 
 file_list <- c(rep1_folder, rep2_folder, merged_folder, ox_folder, unox_folder, ago1_ip_folder,
-               col_input_folder, col_ago_folder)
+               col_input_folder, col_ago_folder, col_salt_folder)
 
 experiment_types <- c("ago2ko-rep1", "ago2ko-rep2", "ago2ko-merge", "wt-ox", "wt-unox", "ago1-ip-merge",
-                      "column-input", "column-ago-fract")
+                      "column-input", "column-ago-fract", "column-salt-fract")
 
 filt.counts.File <- as_tibble(list("file" = unlist(lapply(file_list, filtPosFiles)),
                                    "type" = experiment_types))
@@ -47,10 +48,16 @@ tcCount.Files <-
 tail.Files <-
   as_tibble(list("file" = c(list.files(path = merged_tailFolder, pattern = "ALLtail-info.txt", full.names = TRUE),
                             list.files(path = merged_tailFolder, pattern = "TC-only_tail-info.txt", full.names = TRUE),
-                            list.files(path = merged_tailFolder, pattern = "TC-newbody-only_tail-info.txt", full.names = TRUE)))) %>%
+                            list.files(path = merged_tailFolder, pattern = "TC-newbody-only_tail-info.txt", full.names = TRUE),
+                            list.files(path = merged_tailFolder, pattern = "TC-newbody-only_nomerge_info.txt", full.names = TRUE)))) %>%
   mutate(tail.type = case_when(str_sub(basename(file), 7, 13) == "ALLtail" ~ "all",
                                str_sub(basename(file), 7, 13) == "TC-only" ~ "tc.reads",
-                               str_sub(basename(file), 7, 13) == "TC-newb" ~ "tc.new"))
+                               str_sub(basename(file), 7, 26) == "TC-newbody-only_tail" ~ "tc.new",
+                               str_sub(basename(file), 7, 29) == "TC-newbody-only_nomerge" ~ "tc.new.single"))
+
+noTail.Files <-
+  as_tibble(list("file" = c(list.files(path = merged_tailFolder, pattern = "noTailLenDis_nomerge_info.txt", full.names = TRUE)))) %>%
+  mutate(id = as.numeric(str_sub(basename(file), 1, 5)))
 
 rep1_tp <- c(45493:45501)
 rep2_tp <- c(47117:47125)
@@ -60,6 +67,7 @@ unox_tp <- c(38509:38517)
 ago1_ip_tp <- c(50845:50853)
 col_input_tp <- c(66842:66845, 69455, 66847:66853)
 col_ago_tp <- c(67699:67710)
+col_salt_tp <- c(67723:67734)
 
 expDF <-
   as_tibble(list("experiment" = c(rep("ago2ko-rep1", length(rep1_tp)),
@@ -69,9 +77,10 @@ expDF <-
                                   rep("wt-unox", length(unox_tp)),
                                   rep("ago1-ip-merge", length(ago1_ip_tp)),
                                   rep("column-input", length(col_input_tp)),
-                                  rep("column-ago-fract", length(col_ago_tp))),
+                                  rep("column-ago-fract", length(col_ago_tp)),
+                                  rep("column-salt-fract", length(col_salt_tp))),
                  "timepoint" = c(rep1_tp, rep2_tp, merge_tp, ox_tp, unox_tp, ago1_ip_tp,
-                                 col_input_tp, col_ago_tp)))
+                                 col_input_tp, col_ago_tp, col_salt_tp)))
 
 readFiles <- function(file, type) { read_tsv(file) %>% mutate(experiment = type) }
 
@@ -81,11 +90,14 @@ readTcFiles <- function(file, experiment, ...) {
     mutate(experiment = experiment)
 }
 
-readTailFiles <- function(file, tail.type, ...) {
-  cols <- c("timepoint", "arm.name", "pos", "tail.member", "tail", "tail.count",
-            "total.tails", "seq.count")
+readTailFiles <- function(file, id, ...) {
+  cols <- c("idx", "arm.name", "pos", "total.reads", "lendis.18", "lendis.19", "lendis.20",
+            "lendis.21", "lendis.22", "lendis.23", "lendis.24", "lendis.25",
+            "lendis.26", "lendis.27", "lendis.28", "lendis.29", "lendis.30")
   read_tsv(file, col_names = cols) %>%
-    mutate(tail.type = tail.type)
+    select(-idx) %>%
+    mutate(timepoint = id) %>%
+    select(timepoint, everything())
 }
 
 readNewTailFiles <- function(file, tail.type, ...) {
@@ -119,8 +131,13 @@ tailInfo <-
 
 newTailInfo <-
   tail.Files %>%
-  filter(tail.type == "tc.new") %>%
+  filter(grepl("tc.new", tail.type)) %>%
   purrr::pmap(readNewTailFiles) %>%
+  purrr::reduce(bind_rows)
+
+noTailInfo <-
+  noTail.Files %>%
+  purrr::pmap(readTailFiles) %>%
   purrr::reduce(bind_rows)
 
 # We're only filtering for miRs that we know will cause troubles down the line
@@ -278,6 +295,13 @@ lendis.cutoff.filtered <-
   distinct() %>%
   left_join(lendis.cutoff.raw.filtered)
 
+# We need to add a helper function to fit the prism model of
+# "plateau followed by one-phase association"
+# Y = IF( X<X0, Y0, Y0 + (Plateau - Y0) * (1 - exp( -K * (X - X0) )))
+plat.onephase.model <- function(x, x0, y0, plat, k) {
+  ifelse(x < x0, y0, y0 + (plat - y0) * (1 - exp( -k * (x - x0))))
+}
+
 fits <-
   muts.noBG %>%
   filter(mutCode == "T>C") %>%
@@ -303,7 +327,15 @@ fits <-
                                  data = .),
                         error = function(err) {
                           return(NULL)
-                        }))
+                        }),
+     fit.column = tryCatch(nlsLM(bg.minus.mut ~ plat.onephase.model(time, time0, bg0, plat, k),
+                                 start = list(time0 = 0, bg0 = 0, plat = 0.05, k = 0.5),
+                                 lower = c(60, 0, 0, 0), upper = c(180, 0.1, Inf, Inf),
+                                 control = nls.lm.control(maxiter = 1000),
+                                 na.action = na.omit, data = .),
+                           error = function(err) {
+                             return(NULL)
+                           }))
 
 fit.info <-
   fits %>% mutate(fit.select = ifelse(is.null(fit.one) & is.null(fit.two),
@@ -810,7 +842,7 @@ ago2ko.tidy.hls <-
   select(-pos, -average.ppm, -term, -(std.error:p.value)) %>%
   rename(k = estimate)
 
-muts.normMax <-
+muts.maxNormed <-
   muts.noBG %>%
   left_join(muts.noBG %>%
               filter(time == 1440) %>%
@@ -818,7 +850,10 @@ muts.normMax <-
                      average.ppm, mutCode, max.mut = bg.minus.mut)) %>%
   filter(grepl("T>C", mutCode)) %>%
   group_by(flybase_id, arm.name, start.pos, time, experiment) %>%
-  mutate(max.norm = bg.minus.mut / mean(max.mut)) %>%
+  mutate(max.norm = bg.minus.mut / mean(max.mut))
+
+muts.normMax <-
+  muts.maxNormed %>%
   summarise(avg.tc = mean(bg.minus.mut),
             avg.maxNorm.tc = mean(max.norm)) %>%
   ungroup() %>%
@@ -1316,3 +1351,101 @@ newTailInfo %>%
          tial.frac.G = tail.sum.G / (tail.sum.A + tail.sum.C + tail.sum.G + tail.sum.T),
          tial.frac.T = tail.sum.T / (tail.sum.A + tail.sum.C + tail.sum.G + tail.sum.T)) %>%
   write_tsv(paste0(baseOutput, "/Fig4/tailing/raw/Fig4_ago2ko_tailing_merged-early.tsv"))
+
+newTailed.lendis <-
+  newTailInfo %>%
+  filter(tail.type == "tc.new.single", tail.member == "NoTC") %>%
+  mutate(last.GM = tail.start - 1,
+         tail.len = str_length(tail),
+         tail.nuc.A = str_count(tail, "A") * tail.count,
+         tail.nuc.C = str_count(tail, "C") * tail.count,
+         tail.nuc.G = str_count(tail, "G") * tail.count,
+         tail.nuc.T = str_count(tail, "T") * tail.count,
+         frac.tailed = total.tails / seq.count) %>%
+  group_by(timepoint, arm.name, pos, last.GM, tail.len, total.tails, seq.count, frac.tailed) %>%
+  summarise(total.GM.ends = sum(tail.count),
+            tailcomp.A = sum(tail.nuc.A),
+            tailcomp.C = sum(tail.nuc.C),
+            tailcomp.G = sum(tail.nuc.G),
+            tailcomp.T = sum(tail.nuc.T)) %>%
+  ungroup() %>%
+  bind_rows(noTailInfo %>%
+              rename(seq.count = total.reads) %>%
+              gather(ld.col, total.GM.ends, starts_with("lendis")) %>%
+              mutate(last.GM = as.numeric(str_sub(ld.col, 8, 9))) %>%
+              select(-ld.col) %>%
+              mutate(tail.len = 0, total.tails = seq.count, frac.tailed = 0, tailcomp.A = 0, tailcomp.C = 0,
+                     tailcomp.G = 0, tailcomp.T = 0)) %>%
+  right_join(mir.meta %>%
+               filter(experiment == "ago2ko-merge") %>%
+               select(-experiment, -flybase_id)) %>%
+  filter(!is.na(timepoint)) %>%
+  left_join(reads.per.miR %>%
+              select(flybase_id, arm.name, pos, timepoint, time, sRNAreads) %>%
+              distinct()) %>%
+  mutate(tc.ppm = seq.count / sRNAreads * 1000000,
+         GM.end.ppm = total.GM.ends / sRNAreads * 1000000) %>%
+  select(flybase_id, arm.name, pos, timepoint, time, mir.type, average.ppm, sRNAreads, last.GM,
+         tail.len, total.GM.ends, total.tails, seq.count, tc.ppm, frac.tailed, GM.end.ppm,
+         tailcomp.A, tailcomp.C, tailcomp.G, tailcomp.T)
+
+newTailed.lendis %>%
+  write_tsv(paste0(baseOutput, "/Fig4/tailing/raw/Fig4_ago2ko_tailing_nomerging_w-lendis.tsv"))
+
+ggplot(newTailed.lendis %>% filter(arm.name == "mir-184-3p"),
+       aes(x = last.GM, y = tail.len)) +
+  geom_point(aes(size = GM.end.ppm, alpha = 0.5)) +
+  theme(panel.background = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA, size = 1)) +
+  scale_x_continuous(breaks = c(18, 20, 22, 24, 26, 28)) +
+  scale_y_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  facet_wrap(vars(time)) +
+  guides(size = "legend", alpha = "none") +
+  labs(title = "mir-184-3p",
+       x = "Last GM position",
+       y = "Tail length (nt)",
+       size = "ppm (tailed)")
+
+refFa.file <- paste0(baseFolder, "20161205_Ago1KO_slam-pulse_R2/merged_1811_nfrerun/reference/hairpin.fa")
+
+preMirFasta <- readDNAStringSet(refFa.file)
+preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta),
+                            "full.seq" = paste(str_to_upper(preMirFasta))))
+
+newTailed.lendis.wSeq <-
+  newTailed.lendis %>%
+  left_join(preMirTbl) %>%
+  mutate(mirSeqMax = str_replace_all(str_sub(full.seq, pos, pos + 30), "T", "U"),
+         endNuc = str_sub(mirSeqMax, last.GM, last.GM)) %>%
+  select(everything(), endNuc, mirSeq = mirSeqMax, -full.seq, -flybase_id)
+
+newTailed.lendis.wSeq %>%
+  write_tsv(paste0(baseOutput, "/Fig4/tailing/raw/Fig4_ago2ko_tailing_nomerging_w-lendis-andSeq.tsv"))
+
+inputFile <- ".../Fig4/tailing/raw/Fig4_ago2ko_tailing_nomerging_w-lendis-andSeq.tsv"
+newTailed.lendis.wSeq <- read_tsv(inputFile) 
+
+ggplot(newTailed.lendis.wSeq %>% filter(arm.name == "mir-184-3p"),
+       aes(x = last.GM, y = tail.len)) +
+  geom_point(aes(size = GM.end.ppm, alpha = 0.5)) +
+  theme(panel.background = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA, size = 1)) +
+  scale_x_continuous(breaks = c(18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30),
+                     labels = pull(newTailed.lendis.wSeq %>%
+                                     filter(arm.name == "mir-184-3p") %>%
+                                     select(last.GM, endNuc) %>%
+                                     distinct() %>%
+                                     arrange(last.GM),
+                                   endNuc)) +
+  scale_y_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  expand_limits(y = c(-0.5, 10.5)) +
+  facet_wrap(vars(time)) +
+  guides(size = "legend", alpha = "none") +
+  labs(title = pull(newTailed.lendis.wSeq %>%
+                      filter(arm.name == "mir-184-3p") %>%
+                      mutate(title = paste0(arm.name, " (", mirSeq, ")")) %>%
+                      select(title) %>% distinct(), title),
+       x = "Last GM position",
+       y = "Tail length (nt)",
+       size = "ppm (tailed)")
+
