@@ -16,7 +16,7 @@
  *        - Demultiplexing
  */
 
-version = "0.7.0"
+version = "0.7.99"
 
 /*
  * Helper functions
@@ -34,10 +34,10 @@ params.mismatches = 3
 params.genomeFasta   = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.genomeAnno    = params.genome ? params.genomes[ params.genome ].genomeAnno ?: false : false
 params.mirArmAnno    = params.genome ? params.genomes[ params.genome ].mirArmAnno ?: false : false
-params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
-params.rdna          = params.genome ? params.genomes[ params.genome ].ribosome ?: false : false
-params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
-params.saveReference = false
+// params.conversionIdx = params.genome ? params.genomes[ params.genome ].ucscNames ?: false : false
+// params.rdna          = params.genome ? params.genomes[ params.genome ].ribosome ?: false : false
+// params.repeats       = params.genome ? params.genomes[ params.genome ].repeats ?: false : false
+// params.saveReference = false
 params.name          = "miRNA-Seq Best practice"
 // if params.mismatches is null, assign 3, otherwise assign mismatches
 mismatches           = params.mismatches ?: 3
@@ -140,7 +140,7 @@ process extractHairpins {
 
   script:
   """
-  grep pre_miR $genomeAnno | \
+  grep -E "pre_miR|miRNA_primary" $genomeAnno | \
     sed -e 's/\"//g' | \
     awk -v FS="\t" '{OFS=FS} {
         split(\$9, info, "; ")

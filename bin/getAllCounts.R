@@ -20,7 +20,7 @@ sessionInfo()
 cfg <- getcfg(jsonFile)
 
 preMirFasta <- readDNAStringSet(preMirFastaFile)
-preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta),
+preMirTbl <- as_tibble(list("mir_id" = names(preMirFasta),
                             "full.seq" = paste(str_to_upper(preMirFasta))))
 
 mirBodyLength <- 18
@@ -31,7 +31,7 @@ idCount <- dim(ids)[1]
 
 # `allcounts` records a count of all reads and T>C reads with T>C BQ>27 for all libraries.
 # General columns (pos = start position):
-#  - pos, seqLen, flybase_id, mir_name, `5p`, `3p`, arm.name
+#  - pos, seqLen, mir_id, mir_name, `5p`, `3p`, arm.name
 #
 # Columns (per ID) -- all normalised to sRNAreads from cfg$samples:
 #  - tcLenDis.<libID>    tcReads.<libID>    totalLenDis.<libID>    totalReads.<libID>
@@ -53,7 +53,7 @@ gatheredCounts <-
   replace_na(list(reads = 0)) %>%
   separate(type, c("read.type", "timepoint", "time"),
            sep = "\\.", convert = TRUE) %>%
-  group_by(pos, flybase_id, read.type, timepoint) %>%
+  group_by(pos, mir_id, read.type, timepoint) %>%
     select(-seqLen) %>% distinct() %>%
     mutate(readSum = sum(reads)) %>% select(-reads) %>% distinct() %>%
     dplyr::rename(reads = readSum) %>%
@@ -63,10 +63,10 @@ gatheredCounts <-
 nonZeroPos <-
   gatheredCounts %>%
   filter(read.type == "totalReads", reads != 0) %>%
-  group_by(pos, flybase_id) %>% mutate(libCount = n()) %>% ungroup() %>%
+  group_by(pos, mir_id) %>% mutate(libCount = n()) %>% ungroup() %>%
   filter(libCount == idCount) %>%
-  select(pos, flybase_id, mir_name, arm.name, reads) %>% distinct() %>%
-  group_by(pos, flybase_id) %>% mutate(average.ppm = mean(reads)) %>%
+  select(pos, mir_id, mir_name, arm.name, reads) %>% distinct() %>%
+  group_by(pos, mir_id) %>% mutate(average.ppm = mean(reads)) %>%
   group_by(arm.name) %>% mutate(arm.reads = sum(average.ppm)) %>%
   group_by(mir_name) %>%
     mutate(mir.type = ifelse(arm.reads == max(arm.reads), "mature", "star")) %>%

@@ -25,7 +25,7 @@ cfg <- getcfg(jsonFile)
 mirPositions <- read_tsv(posFile)
 
 preMirFasta <- readDNAStringSet(preMirFastaFile)
-preMirTbl <- as_tibble(list("flybase_id" = names(preMirFasta),
+preMirTbl <- as_tibble(list("mir_id" = names(preMirFasta),
                             "full.seq" = paste(preMirFasta)))
 
 mirBodyLength <- 30
@@ -64,10 +64,10 @@ mirsWmuts <-
                                minLen = mirBodyLength)) %>%
   unnest(muts) %>%
   dplyr::select(-bamFile) %>%
-  left_join(tidyRefNucs, by = c("flybase_id", "pos" = "idx")) %>%
+  left_join(tidyRefNucs, by = c("mir_id", "pos" = "idx")) %>%
   left_join(mirPosWFiles %>%
               dplyr::select(-bamFile),
-              by = c("flybase_id", "timepoint", "time",
+              by = c("mir_id", "timepoint", "time",
                      "mir.type", "start.pos" = "pos"))
 
 mirsWmuts %>% write_tsv("miRs.wAllMuts.tsv")
@@ -82,7 +82,7 @@ mirMutCodes <-
   mutate(mutCode = ifelse(refNuc != nucleotide,
                           paste(refNuc, nucleotide, sep = ">"),
                           refNuc)) %>%
-  group_by(flybase_id, timepoint, pos, start.pos) %>%
+  group_by(mir_id, timepoint, pos, start.pos) %>%
     mutate(depth = sum(count), mutFract = count / depth) %>%
     dplyr::filter(grepl(">", mutCode)) %>%
   ungroup() %>%
@@ -92,12 +92,12 @@ mirMutCodes <-
 mirMutsWide <-
   mirMutCodes %>%
   dplyr::filter(relPos <= 18) %>%
-  group_by(flybase_id, time, start.pos, mutCode) %>%
+  group_by(mir_id, time, start.pos, mutCode) %>%
     mutate(relMutCount = sprintf("%02d", rank(relPos)),
            relMut = paste(mutCode, relMutCount, sep = "_"),
            relMut = str_replace(relMut, ">", "")) %>%
   ungroup() %>%
-  dplyr::select(flybase_id, arm.name, mir.type, start.pos, seed,
+  dplyr::select(mir_id, arm.name, mir.type, start.pos, seed,
                 UCount, timepoint, time, average.ppm, depth,
                 mutFract, relMut) %>%
   spread(relMut, mutFract) %>%

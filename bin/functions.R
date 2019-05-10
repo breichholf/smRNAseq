@@ -63,7 +63,7 @@ getAllCounts <- function(id, align, sRNAreads, time,
     map.r %>%
     group_by(rname, pos, seqLen) %>% summarise(lenDis = n()) %>%
     group_by(rname, pos) %>% mutate(totalReads = sum(lenDis)) %>% ungroup() %>%
-    mutate(flybase_id = as.character(rname))
+    mutate(mir_id = as.character(rname))
 
   # Sum up all reads where the custom TC flag was found
   tcReadCounts <-
@@ -71,15 +71,15 @@ getAllCounts <- function(id, align, sRNAreads, time,
     dplyr::filter(!is.na(TC)) %>%
     group_by(rname, pos, seqLen) %>% summarise(tcLenDis = n()) %>%
     group_by(rname, pos) %>% mutate(tcReads = sum(tcLenDis)) %>% ungroup() %>%
-    mutate(flybase_id = as.character(rname)) %>%
+    mutate(mir_id = as.character(rname)) %>%
     dplyr::select(-rname)
 
   # Join tc Read count in to total reads
   read.summary <-
     totalReadCounts %>%
-    left_join(tcReadCounts, by = c("flybase_id", "pos", "seqLen")) %>%
+    left_join(tcReadCounts, by = c("mir_id", "pos", "seqLen")) %>%
     replace_na(list(totalReads = 0, lenDis = 0, tcReads = 0, tcLenDis = 0)) %>%
-    left_join(mirAnno, by = "flybase_id") %>%
+    left_join(mirAnno, by = "mir_id") %>%
     dplyr::select(-rname)
 
   # Only keep reads that are within +/-10nt of the suggested 5p/3p arm positions
@@ -115,7 +115,7 @@ pileupParallelMuts <- function(groupedData, mc.param, minLen) {
   suppressMessages(require(BiocParallel))
   suppressMessages(require(dplyr))
 
-  fbid <- groupedData$flybase_id
+  fbid <- groupedData$mir_id
   bF <- unique(groupedData$bamFile)
   tp <- groupedData$timepoint
   t <- groupedData$time
@@ -158,7 +158,7 @@ doParallelPileup <- function(miR, timepoint, time, pos, mir.type,
     dplyr::select(-which_label, -strand) %>%
     mutate(relPos = as.numeric(query_bin),
            # Coerce factor to character to avoid warning later on
-           flybase_id = as.character(seqnames),
+           mir_id = as.character(seqnames),
            timepoint = timepoint,
            time = time,
            mir.type = mir.type,
