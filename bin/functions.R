@@ -1,24 +1,42 @@
 setupRlibs <- function(R_lib){
   .libPaths( c( .libPaths(), R_lib ) )
 
-  if(!require("pacman")) {
-    install.packages("pacman", dependencies = TRUE,
-                     repos = "http://cloud.r-project.org/")
+  # if(!require("pacman")) {
+  #   install.packages("pacman", dependencies = TRUE,
+  #                    repos = "http://cloud.r-project.org/")
+  # }
+
+  # p_load(rlang)
+
+
+  # p_install_version(
+  #   c("rlang", "tidyverse", "cowplot", "Biostrings", "Rsamtools",
+  #     "BiocParallel", "jsonlite"),
+  #   c("0.2.1", "1.2.1", "0.9.2", "2.44.2", "1.28.0", "1.10.1", "1.5")
+  # )
+
+  # # Load Tidyverse as late as possible to overload `filter`, `select` and `rename` functions
+  # pacman::p_load(Biostrings, Rsamtools, BiocParallel, rlang,
+  #                tidyverse, cowplot, jsonlite)
+
+  if(!require(rlang)) {
+    stop("Library 'rlang' not found. Please install first.")
   }
-
-  p_load(rlang)
-
-
-  p_install_version(
-    c("rlang", "tidyverse", "cowplot", "Biostrings", "Rsamtools",
-      "BiocParallel", "jsonlite"),
-    c("0.2.1", "1.2.1", "0.9.2", "2.44.2", "1.28.0", "1.10.1", "1.5")
-  )
-
-  # Load Tidyverse as late as possible to overload `filter`, `select` and `rename` functions
-  pacman::p_load(Biostrings, Rsamtools, BiocParallel, rlang,
-                 tidyverse, cowplot, jsonlite)
-
+  if(!require(tidyverse)) {
+    stop("Library 'tidyverse' not found. Please install first.")
+  }
+  if(!require(Biostrings)) {
+    stop("Library 'Biostrings' not found. Please install first.")
+  }
+  if(!require(Rsamtools)) {
+    stop("Library 'Rsamtools' not found. Please install first.")
+  }
+  if(!require(BiocParallel)) {
+    stop("Library 'BiocParallel' not found. Please install first.")
+  }
+  if(!require(jsonlite)) {
+    stop("Library 'jsonlite' not found. Please install first.")
+  }
 }
 
 getcfg <- function(json) {
@@ -32,7 +50,7 @@ getcfg <- function(json) {
 
   cfg.samples <-
     dplyr::bind_rows(cfg.info$samples) %>%
-    mutate(cfg.samples, align = file.path(file.home, align))
+    mutate(align = file.path(file.home, align))
 
   list("samples" = cfg.samples, "anno" = mir.anno)
 }
